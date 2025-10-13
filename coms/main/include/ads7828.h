@@ -6,6 +6,9 @@
  * ============================================================================
  */
 
+#ifndef ADS7828_H
+#define ADS7828_H
+
 #define ADS7828_CMD_PD_Pos (2U)
 #define ADS7828_CMD_PD_Mask (0x3UL << ADS7828_CMD_PD_Pos)
 #define ADS7828_CMD_PD_BTW (0x0UL << ADS7828_CMD_PD_Pos)
@@ -56,3 +59,5 @@
 #define ADS7828_ADDR_ADC1 (ADS7828_ADDR_ID_1 >> ADS7828_ADDR_ID_Pos)
 #define ADS7828_ADDR_ADC2 (ADS7828_ADDR_ID_2 >> ADS7828_ADDR_ID_Pos)
 #define ADS7828_ADDR_ADC3 (ADS7828_ADDR_ID_3 >> ADS7828_ADDR_ID_Pos)
+
+#endif // ADS7828_H

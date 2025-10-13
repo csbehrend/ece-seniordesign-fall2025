@@ -7,6 +7,7 @@
  */
 
 #include "adc.h"
+#include "ble.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -21,8 +22,13 @@ static const char *TAG = "main";
 void app_main(void) {
   ESP_LOGI(TAG, "Coms initialized successfully");
 
+  /*
   init_adc();
   adc_collection_start();
   vTaskDelay(pdMS_TO_TICKS(4000));
   adc_collection_stop();
+  */
+
+  init_ble();
+  start_ble();
 }
