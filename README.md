@@ -10,6 +10,5 @@ The app interacts with the communications and controls subsystem via Bluetooth, 
 The physical glove is controlled by 5 servo motors attached to cables.  Each of them have digitally controlled position 
 (utilizing the ESP32's LED pwm channels) and speed.  There are 10 solenoids which when in their extended positions prevent a joint 
 from bending.  The positions of these 10 solenoids are controlled by spi and a 16 bit shift register.  In addition to movement
-controls, an MAX30102 sensor measures heart rate and blood oxygen level and communicates back to the microcontroller using I2C.  
-This sensor has yet to arrive and be installed.  
+controls, an MAX30102 sensor measures heart rate and blood oxygen level and communicates back to the microcontroller using I2C.   This sensor has yet to arrive and be installed.  
 
