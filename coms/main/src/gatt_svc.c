@@ -85,77 +85,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
                                         {0}},
     },
     /* Object Transfer Service */
-    {
-        .type = BLE_GATT_SVC_TYPE_PRIMARY,
-        .uuid = &ots_svc_uuid.u,
-        .characteristics =
-            (struct ble_gatt_chr_def[]){
-                // OTS Feature
-                {.uuid = &ots_feature_chr_uuid.u,
-                 .access_cb = ots_feature_chr_access,
-                 .flags = BLE_GATT_CHR_F_READ,
-                 .val_handle = &ots_feature_chr_handle},
-                // Object Name
-                {.uuid = &object_name_chr_uuid.u,
-                 .access_cb = object_name_chr_access,
-                 .flags = BLE_GATT_CHR_F_READ,
-                 .val_handle = &object_name_chr_handle},
-                // Object Type
-                {.uuid = &object_type_chr_uuid.u,
-                 .access_cb = object_type_chr_access,
-                 .flags = BLE_GATT_CHR_F_READ,
-                 .val_handle = &object_type_chr_handle},
-                // Object Size
-                {.uuid = &object_size_chr_uuid.u,
-                 .access_cb = object_size_chr_access,
-                 .flags = BLE_GATT_CHR_F_READ,
-                 .val_handle = &object_size_chr_handle},
-                /*
-                // Object First-Created
-                {.uuid = &object_first_created_chr_uuid.u,
-                 .access_cb = object_first_created_chr_access,
-                 .flags = 0,
-                 .val_handle = &object_first_created_chr_handle},
-                // Object Last-Modified
-                {.uuid = &object_last_modified_chr_uuid.u,
-                 .access_cb = object_last_modified_chr_access,
-                 .flags = 0,
-                 .val_handle = &object_last_modified_chr_handle},
-                */
-                // Object ID
-                {.uuid = &object_id_chr_uuid.u,
-                 .access_cb = object_id_chr_access,
-                 .flags = BLE_GATT_CHR_F_READ,
-                 .val_handle = &object_id_chr_handle},
-                // Object Properties
-                {.uuid = &object_properties_chr_uuid.u,
-                 .access_cb = object_properties_chr_access,
-                 .flags = BLE_GATT_CHR_F_READ,
-                 .val_handle = &object_properties_chr_handle},
-                // Object Action Control Point
-                {.uuid = &object_action_control_point_chr_uuid.u,
-                 .access_cb = object_action_control_point_chr_access,
-                 .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE,
-                 .val_handle = &object_action_control_point_chr_handle},
-                /*
-                // Object List Control Point
-                {.uuid = &object_list_control_point_chr_uuid.u,
-                 .access_cb = object_list_control_point_chr_access,
-                 .flags = 0,
-                 .val_handle = &object_list_control_point_chr_handle},
-                // Object List Filter
-                {.uuid = &object_list_filter_chr_uuid.u,
-                 .access_cb = object_list_filter_chr_access,
-                 .flags = 0,
-                 .val_handle = &object_list_filter_chr_handle},
-                // Object Changed
-                {.uuid = &object_changed_chr_uuid.u,
-                 .access_cb = object_changed_chr_access,
-                 .flags = 0,
-                 .val_handle = &object_changed_chr_handle},
-                */
-                {0}},
-    },
+    OTS_SERVICE_ENTRY(),
     {
         0, /* No more services. */
     },
