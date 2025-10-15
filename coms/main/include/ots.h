@@ -4,7 +4,6 @@
 /* Includes */
 #include "common.h"
 #include "esp_attr.h"
-#include <stdint.h>
 
 SVC_DECLARE_UUID16(ots);
 
@@ -29,7 +28,8 @@ CHR_DECLARE_UUID16(object_action_control_point);
         GATT_CHR_ENTRY(object_size, BLE_GATT_CHR_F_READ),                      \
         GATT_CHR_ENTRY(object_id, BLE_GATT_CHR_F_READ),                        \
         GATT_CHR_ENTRY(object_properties, BLE_GATT_CHR_F_READ),                \
-        GATT_CHR_ENTRY(object_action_control_point, BLE_GATT_CHR_F_READ),      \
+        GATT_CHR_ENTRY(object_action_control_point,                            \
+                       BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),        \
         GATT_SVC_ENTRY_END()
 
 typedef union PACKED_ATTR {
@@ -46,7 +46,7 @@ typedef union PACKED_ATTR {
     bool abort : 1;
   } decoded;
   uint32_t raw;
-} ots_feature_val_oacp_t;
+} ots_feature_oacp_t;
 
 typedef union PACKED_ATTR {
   struct PACKED_ATTR {
@@ -56,15 +56,94 @@ typedef union PACKED_ATTR {
     bool clear_marking : 1;
   } decoded;
   uint32_t raw;
-} ots_feature_val_olcp_t;
+} ots_feature_olcp_t;
 
 typedef union PACKED_ATTR {
   struct PACKED_ATTR {
-    ots_feature_val_oacp_t oacp;
-    ots_feature_val_olcp_t olcp;
+    ots_feature_oacp_t oacp;
+    ots_feature_olcp_t olcp;
   } decoded;
   uint64_t raw;
-} ots_feature_val_t;
+} ots_feature_t;
+
+typedef union PACKED_ATTR {
+  struct PACKED_ATTR {
+    uint32_t current_size;
+    uint32_t allocated_size;
+  } decoded;
+  uint64_t raw;
+} object_size_t;
+
+typedef union PACKED_ATTR {
+  struct PACKED_ATTR {
+    bool delete : 1;
+    bool execute : 1;
+    bool read : 1;
+    bool write : 1;
+    bool append : 1;
+    bool truncate : 1;
+    bool patch : 1;
+    bool mark : 1;
+  } decoded;
+  uint32_t raw;
+} object_properties_t;
+
+typedef enum PACKED_ATTR {
+  OACP_OP_CREATE = 0x01,
+  OACP_OP_DELETE = 0x02,
+  OACP_OP_CHECKSUM = 0x03,
+  OACP_OP_EXECUTE = 0x04,
+  OACP_OP_READ = 0x05,
+  OACP_OP_WRITE = 0x06,
+  OACP_OP_RESPONSE = 0x60
+} oacp_opcode_t;
+
+typedef enum PACKED_ATTR {
+  OACP_RESULT_SUCCESS = 0x01,
+  OACP_RESULT_UNSUPP_OP = 0x02,
+  OACP_RESULT_INV_PARAM = 0x03,
+  OACP_RESULT_INSUFFICIENT_RESOURCES = 0x04,
+  OACP_RESULT_INV_OBJECT = 0x05,
+  OACP_RESULT_CHANNEL_UNAVAILBLE = 0x06,
+  OACP_RESULT_UNSUPP_TYPE = 0x07,
+  OACP_RESULT_PROCEDURE_NOT_PERMITTED = 0x08,
+  OACP_RESULT_OBJ_LOCKED = 0x09,
+  OACP_RESULT_OP_FAILED = 0x0A
+} oacp_result_code_t;
+
+typedef struct PACKED_ATTR {
+  oacp_opcode_t op;
+  union PACKED_ATTR {
+    struct PACKED_ATTR {
+      uint32_t size;
+      union PACKED_ATTR {
+        uint16_t uuid16;
+        uint32_t uuid32;
+        uint8_t uuid128[16];
+      } type;
+    } create_param;
+    struct PACKED_ATTR {
+      uint32_t offset;
+      uint32_t length;
+    } checksum_read_param;
+    struct PACKED_ATTR {
+      uint32_t offset;
+      uint32_t length;
+      uint8_t mode;
+    } write_param;
+    uint8_t raw[20];
+  } parameter;
+} oacp_val_t;
+
+typedef struct PACKED_ATTR {
+  oacp_opcode_t request;
+  oacp_result_code_t result;
+} oacp_response_t;
+
+typedef struct PACKED_ATTR {
+  oacp_response_t response;
+  uint32_t checksum;
+} oacp_response_checksum_t;
 
 // OTS Feature OACP
 #define OTS_FEATURE_SUPPORTED_OACP_CREATE_Pos (0U)
