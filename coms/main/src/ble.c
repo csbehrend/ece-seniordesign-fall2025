@@ -23,9 +23,9 @@
 /* BLE */
 #include "ble.h"
 #include "bleprph.h"
-#include "console/console.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
+#include "led.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "services/gap/ble_svc_gap.h"
@@ -305,6 +305,8 @@ void bleprph_host_task(void *param) {
 
 void init_ble(void) {
   int rc;
+
+  led_init();
 
   /* Initialize NVS — it is used to store PHY calibration data */
   esp_err_t ret = nvs_flash_init();

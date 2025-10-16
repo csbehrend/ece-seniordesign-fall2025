@@ -19,7 +19,7 @@ CHR_DEFINE_UUID16(object_size, 0x2AC0);
 CHR_DEFINE_UUID16(object_id, 0x2AC3);
 CHR_DEFINE_UUID16(object_properties, 0x2AC4);
 CHR_DEFINE_UUID16(object_action_control_point, 0x2AC5);
-// CHR_DEFINE_UUID16(object_list_control_point, 0x2AC6);
+CHR_DEFINE_UUID16(object_list_control_point, 0x2AC6);
 // CHR_DEFINE_UUID16(object_list_filter, 0x2AC7);
 // CHR_DEFINE_UUID16(object_changed, 0x2AC8);
 
@@ -226,6 +226,7 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
   int rc = 0;
   oacp_request_t request = {0};
   oacp_response_t response = {0};
+  response.rc = OACP_OP_RESPONSE;
   struct os_mbuf *txom = NULL;
 
   // Will always be a write
@@ -297,6 +298,88 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
     response.result = OACP_RESULT_UNSUPP_OP;
     ESP_LOGE(TAG,
              "object_action_control_point_chr_access: invalid OACP opcode %d "
+             "past support check ",
+             request.op);
+    goto indicate;
+  }
+
+indicate:
+  txom = ble_hs_mbuf_from_flat(&response, sizeof(response));
+  if (!txom) {
+    return BLE_ATT_ERR_INSUFFICIENT_RES;
+  }
+  ble_gatts_indicate_custom(conn_handle, object_action_control_point_chr_handle,
+                            txom);
+  return rc;
+}
+
+int object_list_control_point_chr_access(uint16_t conn_handle,
+                                         uint16_t attr_handle,
+                                         struct ble_gatt_access_ctxt *ctxt,
+                                         void *arg) {
+  int rc = 0;
+  olcp_request_t request = {0};
+  olcp_response_t response = {0};
+  response.rc = OLCP_OP_RESPONSE_CODE;
+  struct os_mbuf *txom = NULL;
+
+  // Will always be a write
+  if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
+    ESP_LOGE(TAG,
+             "object_list_control_point_chr_access: unexpected operation, "
+             "opcode: %d",
+             ctxt->op);
+    assert(0);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  // Handle access events
+  verify_conn_handle(conn_handle, attr_handle);
+
+  // Verify attribute handle
+  if (attr_handle != object_list_control_point_chr_handle) {
+    ESP_LOGE(TAG,
+             "object_list_control_point_chr_access: invalid attr_handle %d",
+             attr_handle);
+    assert(0);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  // Read request
+  uint16_t len = 0;
+  rc = ble_hs_mbuf_to_flat(ctxt->om, &request, sizeof(request), &len);
+  if (rc) {
+    response.result = OACP_RESULT_INSUFFICIENT_RESOURCES;
+    ESP_LOGE(TAG, "object_list_control_point_chr_access: bad mbuf read");
+    goto indicate;
+  }
+
+  assert(len == sizeof(request));
+
+  // Update the response struct
+  response.op = request.op;
+
+  // TODO: check global enable for opcode
+
+  // TODO: add length and object property check (currently ignored)
+  response.result = OACP_RESULT_SUCCESS;
+  switch (request.op) {
+  case OLCP_OP_FIRST:
+    g_obj_current = 0;
+    goto indicate;
+  case OLCP_OP_LAST:
+    g_obj_current = g_obj_array_len - 1;
+    goto indicate;
+  case OLCP_OP_PREVIOUS:
+    g_obj_current = (g_obj_current - 1) % g_obj_array_len;
+    goto indicate;
+  case OLCP_OP_NEXT:
+    g_obj_current = (g_obj_current + 1) % g_obj_array_len;
+    goto indicate;
+  default:
+    response.result = OACP_RESULT_UNSUPP_OP;
+    ESP_LOGE(TAG,
+             "object_list_control_point_chr_access: invalid OLCP opcode %d "
              "past support check ",
              request.op);
     goto indicate;

@@ -20,6 +20,7 @@
 #include "bleprph.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
+#include "led.h"
 #include "ots.h"
 #include "services/ans/ble_svc_ans.h"
 #include "services/gap/ble_svc_gap.h"
@@ -86,6 +87,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
                 }},
     },
     OTS_SERVICE_ENTRY(),
+    LED_SERVICE_ENTRY(),
     {
         0, /* No more services. */
     },

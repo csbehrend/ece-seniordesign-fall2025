@@ -4,7 +4,6 @@
 /* Includes */
 #include "common.h"
 #include "esp_attr.h"
-#include <stdint.h>
 
 SVC_DECLARE_UUID16(ots);
 
@@ -17,7 +16,7 @@ CHR_DECLARE_UUID16(object_size);
 CHR_DECLARE_UUID16(object_id);
 CHR_DECLARE_UUID16(object_properties);
 CHR_DECLARE_UUID16(object_action_control_point);
-// CHR_DECLARE_UUID16(object_list_control_point);
+CHR_DECLARE_UUID16(object_list_control_point);
 // CHR_DECLARE_UUID16(object_list_filter);
 // CHR_DECLARE_UUID16(object_changed);
 
@@ -30,6 +29,8 @@ CHR_DECLARE_UUID16(object_action_control_point);
         GATT_CHR_ENTRY(object_id, BLE_GATT_CHR_F_READ),                        \
         GATT_CHR_ENTRY(object_properties, BLE_GATT_CHR_F_READ),                \
         GATT_CHR_ENTRY(object_action_control_point,                            \
+                       BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),        \
+        GATT_CHR_ENTRY(object_list_control_point,                              \
                        BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),        \
         GATT_SVC_ENTRY_END()
 
@@ -143,6 +144,7 @@ typedef struct PACKED_ATTR {
 } oacp_request_t;
 
 typedef struct PACKED_ATTR {
+  oacp_opcode_t rc;
   oacp_opcode_t op;
   oacp_result_code_t result;
 } oacp_response_t;
@@ -151,6 +153,35 @@ typedef struct PACKED_ATTR {
   oacp_response_t response;
   uint32_t checksum;
 } oacp_response_checksum_t;
+
+typedef enum PACKED_ATTR {
+  OLCP_OP_FIRST = 0x01,
+  OLCP_OP_LAST = 0x02,
+  OLCP_OP_PREVIOUS = 0x03,
+  OLCP_OP_NEXT = 0x04,
+  OLCP_OP_RESPONSE_CODE = 0x70
+} olcp_opcode_t;
+
+typedef enum PACKED_ATTR {
+  OLCP_RESULT_SUCCESS = 0x01,
+  OLCP_RESULT_UNSUPP_OP = 0x02,
+  OLCP_RESULT_INV_PARAM = 0x03,
+  OLCP_RESULT_OP_FAILED = 0x04,
+  OLCP_RESULT_OUT_OF_BOUNDS = 0x05,
+  OLCP_RESULT_TOO_MANY_OBJ = 0x06,
+  OLCP_RESULT_NO_OBJ = 0x07,
+  OLCP_RESULT_OBJ_ID_NOT_FOUND = 0x08
+} olcp_result_code_t;
+
+typedef struct PACKED_ATTR {
+  olcp_opcode_t op;
+} olcp_request_t;
+
+typedef struct PACKED_ATTR {
+  olcp_opcode_t rc;
+  olcp_opcode_t op;
+  olcp_result_code_t result;
+} olcp_response_t;
 
 #define OTS_OBJECT_LUID_BITS (48)
 #define OTS_OBJECT_LUID_BYTES (OTS_OBJECT_LUID_BITS / 8)
