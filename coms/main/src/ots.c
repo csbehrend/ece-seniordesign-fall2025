@@ -4,7 +4,9 @@
 #include "host/ble_gatt.h"
 #include "host/ble_hs_mbuf.h"
 #include "os/os_mbuf.h"
+#include "ots_store.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 SVC_DEFINE_UUID16(ots, 0x1825);
 
@@ -22,10 +24,7 @@ CHR_DEFINE_UUID16(object_action_control_point, 0x2AC5);
 // CHR_DEFINE_UUID16(object_changed, 0x2AC8);
 
 static const ots_feature_t ots_feature_chr_value = {
-    .decoded = {.oacp.decoded = {.read = 1}}};
-
-static object_size_t object_size_chr_value = {
-    .decoded = {.allocated_size = 0xDEAD, .current_size = 0xBEEF}};
+    .decoded = {.oacp.decoded = {.read = 1, .write = 1}}};
 
 static inline void verify_conn_handle(uint16_t conn_handle,
                                       uint16_t attr_handle) {
@@ -86,48 +85,138 @@ error:
 
 int object_name_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
-  return 0;
+  int rc = 0;
+  ots_object_t *obj = CURRENT_OBJ();
+
+  // Handle access events
+  if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
+    ESP_LOGE(TAG, "object_name_chr_access: unexpected operation, opcode: %d",
+             ctxt->op);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+  verify_conn_handle(conn_handle, attr_handle);
+
+  // Verify attribute handle
+  if (attr_handle != object_name_chr_handle) {
+    ESP_LOGE(TAG, "object_name_chr_access: bad attr_handle");
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  rc = os_mbuf_append(ctxt->om, obj->name, obj->name_len);
+  return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_type_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
-  return 0;
+  int rc = 0;
+  ots_object_t *obj = CURRENT_OBJ();
+
+  // Handle access events
+  if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
+    ESP_LOGE(TAG, "object_type_chr_access: unexpected operation, opcode: %d",
+             ctxt->op);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+  verify_conn_handle(conn_handle, attr_handle);
+
+  // Verify attribute handle
+  if (attr_handle != object_type_chr_handle) {
+    ESP_LOGE(TAG, "object_type_chr_access: bad attr_handle");
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  const ble_uuid_t *uuid = obj->type;
+  assert(uuid);
+
+  switch (uuid->type) {
+  case BLE_UUID_TYPE_16:
+    rc = os_mbuf_append(ctxt->om, &((ble_uuid16_t *)uuid)->value,
+                        sizeof(((ble_uuid16_t *)uuid)->value));
+    break;
+  case BLE_UUID_TYPE_32:
+    rc = os_mbuf_append(ctxt->om, &((ble_uuid32_t *)uuid)->value,
+                        sizeof(((ble_uuid32_t *)uuid)->value));
+    break;
+  case BLE_UUID_TYPE_128:
+    rc = os_mbuf_append(ctxt->om, &((ble_uuid128_t *)uuid)->value,
+                        sizeof(((ble_uuid128_t *)uuid)->value));
+    break;
+  default:
+    ESP_LOGE(TAG, "object_type_chr_access: bad uuid type %d", obj->type->type);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_size_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
+  ots_object_t *obj = CURRENT_OBJ();
 
   // Handle access events
-  switch (ctxt->op) {
-  case BLE_GATT_ACCESS_OP_READ_CHR:
-    verify_conn_handle(conn_handle, attr_handle);
+  if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
+    ESP_LOGE(TAG, "object_size_chr_access: unexpected operation, opcode: %d",
+             ctxt->op);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+  verify_conn_handle(conn_handle, attr_handle);
 
-    // Verify attribute handle
-    if (attr_handle == object_size_chr_handle) {
-      rc = os_mbuf_append(ctxt->om, &object_size_chr_value,
-                          sizeof(object_size_chr_value));
-      return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
-    }
-    goto error;
-  default:
-    goto error;
+  // Verify attribute handle
+  if (attr_handle != object_size_chr_handle) {
+    ESP_LOGE(TAG, "object_size_chr_access: bad attr_handle");
+    return BLE_ATT_ERR_UNLIKELY;
   }
 
-error:
-  ESP_LOGE(TAG, "object_size_chr_access: unexpected operation, opcode: %d",
-           ctxt->op);
-  return BLE_ATT_ERR_UNLIKELY;
+  rc = os_mbuf_append(ctxt->om, &obj->size, sizeof(obj->size));
+  return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_id_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                          struct ble_gatt_access_ctxt *ctxt, void *arg) {
-  return 0;
+  int rc = 0;
+  ots_object_t *obj = CURRENT_OBJ();
+
+  // Handle access events
+  if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
+    ESP_LOGE(TAG, "object_id_chr_access: unexpected operation, opcode: %d",
+             ctxt->op);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+  verify_conn_handle(conn_handle, attr_handle);
+
+  // Verify attribute handle
+  if (attr_handle != object_id_chr_handle) {
+    ESP_LOGE(TAG, "object_id_chr_access: bad attr_handle");
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  rc = os_mbuf_append(ctxt->om, &obj->id.luid, sizeof(obj->id.luid));
+  return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_properties_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                                  struct ble_gatt_access_ctxt *ctxt, void *arg) {
-  return 0;
+  int rc = 0;
+  ots_object_t *obj = CURRENT_OBJ();
+
+  // Handle access events
+  if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
+    ESP_LOGE(TAG,
+             "object_properties_chr_access: unexpected operation, opcode: %d",
+             ctxt->op);
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+  verify_conn_handle(conn_handle, attr_handle);
+
+  // Verify attribute handle
+  if (attr_handle != object_properties_chr_handle) {
+    ESP_LOGE(TAG, "object_properties_chr_access: bad attr_handle");
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  rc = os_mbuf_append(ctxt->om, &obj->properties, sizeof(obj->properties));
+  return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_action_control_point_chr_access(uint16_t conn_handle,
@@ -137,6 +226,7 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
   int rc = 0;
   oacp_request_t request = {0};
   oacp_response_t response = {0};
+  struct os_mbuf *txom = NULL;
 
   // Will always be a write
   if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
@@ -169,12 +259,20 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
     goto indicate;
   }
 
+  assert(len > 0);
+
   // Update the response struct
   response.op = request.op;
 
   if (!check_oacp_op_supported(request.op)) {
+    response.result = OACP_RESULT_UNSUPP_OP;
+    ESP_LOGE(TAG,
+             "object_action_control_point_chr_access: unsupported opcode %d",
+             request.op);
+    goto indicate;
   }
 
+  // TODO: add length and object property check (currently ignored)
   switch (request.op) {
   case OACP_OP_READ:
     response.result = OACP_RESULT_SUCCESS;
@@ -201,10 +299,11 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
              "object_action_control_point_chr_access: invalid OACP opcode %d "
              "past support check ",
              request.op);
+    goto indicate;
   }
 
 indicate:
-  struct os_mbuf *txom = ble_hs_mbuf_from_flat(&response, sizeof(response));
+  txom = ble_hs_mbuf_from_flat(&response, sizeof(response));
   if (!txom) {
     return BLE_ATT_ERR_INSUFFICIENT_RES;
   }

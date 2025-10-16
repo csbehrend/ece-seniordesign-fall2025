@@ -4,6 +4,7 @@
 /* Includes */
 #include "common.h"
 #include "esp_attr.h"
+#include <stdint.h>
 
 SVC_DECLARE_UUID16(ots);
 
@@ -72,7 +73,7 @@ typedef union PACKED_ATTR {
     uint32_t allocated_size;
   } decoded;
   uint64_t raw;
-} object_size_t;
+} ots_object_size_t;
 
 typedef union PACKED_ATTR {
   struct PACKED_ATTR {
@@ -86,7 +87,7 @@ typedef union PACKED_ATTR {
     bool mark : 1;
   } decoded;
   uint32_t raw;
-} object_properties_t;
+} ots_object_properties_t;
 
 typedef enum PACKED_ATTR {
   OACP_OP_CREATE = 0x01,
@@ -112,6 +113,12 @@ typedef enum PACKED_ATTR {
 } oacp_result_code_t;
 
 typedef struct PACKED_ATTR {
+  uint8_t pad0 : 1;
+  bool truncate : 1;
+  uint8_t pad2_7 : 6;
+} ots_write_mode_t;
+
+typedef struct PACKED_ATTR {
   oacp_opcode_t op;
   union PACKED_ATTR {
     struct PACKED_ATTR {
@@ -129,7 +136,7 @@ typedef struct PACKED_ATTR {
     struct PACKED_ATTR {
       uint32_t offset;
       uint32_t length;
-      uint8_t mode;
+      ots_write_mode_t mode;
     } write_param;
     uint8_t raw[20];
   } parameter;
@@ -145,62 +152,13 @@ typedef struct PACKED_ATTR {
   uint32_t checksum;
 } oacp_response_checksum_t;
 
-// OTS Feature OACP
-#define OTS_FEATURE_SUPPORTED_OACP_CREATE_Pos (0U)
-#define OTS_FEATURE_SUPPORTED_OACP_CREATE                                      \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_CREATE_Pos)
+#define OTS_OBJECT_LUID_BITS (48)
+#define OTS_OBJECT_LUID_BYTES (OTS_OBJECT_LUID_BITS / 8)
+#define OTS_OBJECT_LUID_MIN 0x0100
 
-#define OTS_FEATURE_SUPPORTED_OACP_DELETE_Pos (1U)
-#define OTS_FEATURE_SUPPORTED_OACP_DELETE                                      \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_DELETE_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_CHECKSUM_Pos (2U)
-#define OTS_FEATURE_SUPPORTED_OACP_CHECKSUM                                    \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_CHECKSUM_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_EXECUTE_Pos (3U)
-#define OTS_FEATURE_SUPPORTED_OACP_EXECUTE                                     \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_EXECUTE_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_READ_Pos (4U)
-#define OTS_FEATURE_SUPPORTED_OACP_READ                                        \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_READ_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_WRITE_Pos (5U)
-#define OTS_FEATURE_SUPPORTED_OACP_WRITE                                       \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_WRITE_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_APPEND_Pos (6U)
-#define OTS_FEATURE_SUPPORTED_OACP_APPEND                                      \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_APPEND_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_TRUNCATE_Pos (7U)
-#define OTS_FEATURE_SUPPORTED_OACP_TRUNCATE                                    \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_TRUNCATE_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_PATCH_Pos (8U)
-#define OTS_FEATURE_SUPPORTED_OACP_PATCH                                       \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_PATCH_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OACP_ABORT_Pos (9U)
-#define OTS_FEATURE_SUPPORTED_OACP_ABORT                                       \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OACP_ABORT_Pos)
-
-// OTS Feature OLCP
-#define OTS_FEATURE_SUPPORTED_OLCP_GOTO_Pos (0U)
-#define OTS_FEATURE_SUPPORTED_OLCP_GOTO                                        \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OLCP_GOTO_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OLCP_ORDER_Pos (1U)
-#define OTS_FEATURE_SUPPORTED_OLCP_ORDER                                       \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OLCP_ORDER_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OLCP_REQUEST_NUM_OBJS_Pos (2U)
-#define OTS_FEATURE_SUPPORTED_OLCP_REQUEST_NUM_OBJS                            \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OLCP_REQUEST_NUM_OBJS_Pos)
-
-#define OTS_FEATURE_SUPPORTED_OLCP_CLEAR_MARKING_Pos (3U)
-#define OTS_FEATURE_SUPPORTED_OLCP_CLEAR_MARKING                               \
-  (0x1UL << OTS_FEATURE_SUPPORTED_OLCP_CLEAR_MARKING_Pos)
+typedef union PACKED_ATTR {
+  uint8_t luid[OTS_OBJECT_LUID_BYTES];
+  uint64_t raw;
+} ots_object_luid_t;
 
 #endif // OTS_H
