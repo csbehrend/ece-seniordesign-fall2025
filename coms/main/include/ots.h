@@ -133,10 +133,10 @@ typedef struct PACKED_ATTR {
     } write_param;
     uint8_t raw[20];
   } parameter;
-} oacp_val_t;
+} oacp_request_t;
 
 typedef struct PACKED_ATTR {
-  oacp_opcode_t request;
+  oacp_opcode_t op;
   oacp_result_code_t result;
 } oacp_response_t;
 
