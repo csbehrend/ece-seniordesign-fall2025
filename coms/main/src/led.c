@@ -8,10 +8,18 @@
 
 #include "led.h"
 #include "common.h"
+#include "host/ble_gatt.h"
 
 SVC_DEFINE_UUID16(auto_io, 0x1815);
 CHR_DEFINE_UUID128(led, 0x23, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde,
                    0xef, 0x12, 0x12, 0x25, 0x15, 0x00, 0x00);
+
+SVC_DEFINE_UUID128(nrf_service, 0x23, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15,
+                   0xde, 0xef, 0x12, 0x12, 0x23, 0x15, 0x00, 0x00);
+CHR_DEFINE_UUID128(nrf_led, 0x23, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15,
+                   0xde, 0xef, 0x12, 0x12, 0x25, 0x15, 0x00, 0x00);
+CHR_DEFINE_UUID128(nrf_button, 0x23, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15,
+                   0xde, 0xef, 0x12, 0x12, 0x24, 0x15, 0x00, 0x00);
 
 /* Private variables */
 static uint8_t led_state;
@@ -103,4 +111,53 @@ error:
   ESP_LOGE(TAG, "unexpected access operation to led characteristic, opcode: %d",
            ctxt->op);
   return BLE_ATT_ERR_UNLIKELY;
+}
+
+int nrf_led_chr_access(uint16_t conn_handle, uint16_t attr_handle,
+                       struct ble_gatt_access_ctxt *ctxt, void *arg) {
+  int rc = 0;
+
+  // Handle access events
+  switch (ctxt->op) {
+  case BLE_GATT_ACCESS_OP_WRITE_CHR:
+    /* Verify connection handle */
+    if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+      ESP_LOGI(TAG, "characteristic write; conn_handle=%d attr_handle=%d",
+               conn_handle, attr_handle);
+    } else {
+      ESP_LOGI(TAG, "characteristic write by nimble stack; attr_handle=%d",
+               attr_handle);
+    }
+
+    // Verify attribute handle
+    if (attr_handle == nrf_led_chr_handle) {
+      uint16_t len = 0;
+      uint8_t op = 0;
+      rc = ble_hs_mbuf_to_flat(ctxt->om, &op, sizeof(op), &len);
+      if (rc || len != sizeof(op)) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
+      if (op) {
+        led_on();
+        ESP_LOGI(TAG, "NORDIC turned on!");
+      } else {
+        led_off();
+        ESP_LOGI(TAG, "NORDIC turned off!");
+      }
+      return rc;
+    }
+    goto error;
+  default:
+    goto error;
+  }
+error:
+  ESP_LOGE(TAG,
+           "unexpected access operation to NORDIC characteristic, opcode: %d",
+           ctxt->op);
+  return BLE_ATT_ERR_UNLIKELY;
+}
+
+int nrf_button_chr_access(uint16_t conn_handle, uint16_t attr_handle,
+                          struct ble_gatt_access_ctxt *ctxt, void *arg) {
+  return 0;
 }

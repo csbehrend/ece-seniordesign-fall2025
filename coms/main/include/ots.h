@@ -21,18 +21,18 @@ CHR_DECLARE_UUID16(object_list_control_point);
 // CHR_DECLARE_UUID16(object_changed);
 
 #define OTS_SERVICE_ENTRY()                                                    \
-  GATT_SVC_ENTRY_BEGIN(ots) {                                                  \
-    GATT_CHR_ENTRY(ots_feature, BLE_GATT_CHR_F_READ),                          \
-        GATT_CHR_ENTRY(object_name, BLE_GATT_CHR_F_READ),                      \
-        GATT_CHR_ENTRY(object_type, BLE_GATT_CHR_F_READ),                      \
-        GATT_CHR_ENTRY(object_size, BLE_GATT_CHR_F_READ),                      \
-        GATT_CHR_ENTRY(object_id, BLE_GATT_CHR_F_READ),                        \
-        GATT_CHR_ENTRY(object_properties, BLE_GATT_CHR_F_READ),                \
-        GATT_CHR_ENTRY(object_action_control_point,                            \
-                       BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),        \
-        GATT_CHR_ENTRY(object_list_control_point,                              \
-                       BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),        \
-        GATT_SVC_ENTRY_END()
+  GATT_SVC_ENTRY_BEGIN(ots)                                                    \
+  GATT_CHR_ENTRY(ots_feature, BLE_GATT_CHR_F_READ),                            \
+      GATT_CHR_ENTRY(object_name, BLE_GATT_CHR_F_READ),                        \
+      GATT_CHR_ENTRY(object_type, BLE_GATT_CHR_F_READ),                        \
+      GATT_CHR_ENTRY(object_size, BLE_GATT_CHR_F_READ),                        \
+      GATT_CHR_ENTRY(object_id, BLE_GATT_CHR_F_READ),                          \
+      GATT_CHR_ENTRY(object_properties, BLE_GATT_CHR_F_READ),                  \
+      GATT_CHR_ENTRY(object_action_control_point,                              \
+                     BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),          \
+      GATT_CHR_ENTRY(object_list_control_point,                                \
+                     BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),          \
+      GATT_SVC_ENTRY_END()
 
 typedef union PACKED_ATTR {
   struct PACKED_ATTR {

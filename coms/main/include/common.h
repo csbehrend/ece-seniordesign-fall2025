@@ -99,7 +99,7 @@
 #define GATT_SVC_ENTRY_BEGIN(name)                                             \
   {                                                                            \
     .type = BLE_GATT_SVC_TYPE_PRIMARY, .uuid = &name##_svc_uuid.u,             \
-    .characteristics = (struct ble_gatt_chr_def[])
+    .characteristics = (struct ble_gatt_chr_def[]) {
 
 #define GATT_SVC_ENTRY_END() {0}}                                              \
   }

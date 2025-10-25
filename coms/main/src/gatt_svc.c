@@ -88,6 +88,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     },
     OTS_SERVICE_ENTRY(),
     LED_SERVICE_ENTRY(),
+    NRF_SERVICE_ENTRY(),
     {
         0, /* No more services. */
     },
