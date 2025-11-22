@@ -23,8 +23,10 @@ CHR_DEFINE_UUID16(object_list_control_point, 0x2AC6);
 // CHR_DEFINE_UUID16(object_list_filter, 0x2AC7);
 // CHR_DEFINE_UUID16(object_changed, 0x2AC8);
 
+// static const ots_feature_t ots_feature_chr_value = {
+// .decoded = {.oacp.decoded = {.read = 1, .write = 1}}};
 static const ots_feature_t ots_feature_chr_value = {
-    .decoded = {.oacp.decoded = {.read = 1, .write = 1}}};
+    .decoded = {.oacp.decoded = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}};
 
 static inline void verify_conn_handle(uint16_t conn_handle,
                                       uint16_t attr_handle) {

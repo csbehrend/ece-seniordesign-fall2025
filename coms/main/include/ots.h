@@ -5,6 +5,8 @@
 #include "common.h"
 #include "esp_attr.h"
 
+#define OTS_COC_PSM (0x0025)
+
 SVC_DECLARE_UUID16(ots);
 
 CHR_DECLARE_UUID16(ots_feature);

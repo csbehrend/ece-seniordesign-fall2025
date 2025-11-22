@@ -26,8 +26,6 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include <assert.h>
-#include <stdio.h>
-#include <string.h>
 
 /*** Maximum number of characteristics with the notify flag ***/
 #define MAX_NOTIFY 5

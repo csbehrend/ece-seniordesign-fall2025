@@ -23,11 +23,13 @@
 /* BLE */
 #include "ble.h"
 #include "bleprph.h"
+#include "coc.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
 #include "led.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
+#include "ots.h"
 #include "services/gap/ble_svc_gap.h"
 
 static const char *tag = "NimBLE_BLE_PRPH";
@@ -152,6 +154,15 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg) {
       rc = ble_gap_conn_find(event->connect.conn_handle, &desc);
       assert(rc == 0);
       bleprph_print_conn_desc(&desc);
+
+      rc = ble_l2cap_create_server(OTS_COC_PSM, MTU, bleprph_l2cap_coc_event_cb,
+                                   NULL);
+      if (rc != 0) {
+        ESP_LOGE(TAG, "failed to start l2cap coc server, error code: %d", rc);
+        return rc;
+      }
+
+      ESP_LOGI(TAG, "started coc server at psm %d", OTS_COC_PSM);
     }
     MODLOG_DFLT(INFO, "\n");
 
@@ -307,6 +318,8 @@ void init_ble(void) {
   int rc;
 
   led_init();
+
+  bleprph_l2cap_coc_mem_init();
 
   /* Initialize NVS — it is used to store PHY calibration data */
   esp_err_t ret = nvs_flash_init();
