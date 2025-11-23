@@ -13,6 +13,43 @@ static os_membuf_t sdu_coc_mem[COC_MBUF_MEMPOOL_SIZE];
 static struct os_mempool sdu_coc_mbuf_mempool;
 static struct os_mbuf_pool sdu_os_mbuf_pool;
 static uint16_t peer_sdu_size;
+static struct ble_l2cap_chan *coc_chan = NULL;
+
+static void blecent_l2cap_coc_send_data(struct ble_l2cap_chan *chan) {
+  struct os_mbuf *sdu_rx_data;
+  int rc = 0;
+  int len = 512 * 2;
+  uint8_t value[len];
+
+  for (int i = 0; i < len; i++) {
+    value[i] = len - i - 1;
+  }
+
+  do {
+    sdu_rx_data = os_mbuf_get_pkthdr(&sdu_os_mbuf_pool, 0);
+    if (sdu_rx_data == NULL) {
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+      sdu_rx_data = os_mbuf_get_pkthdr(&sdu_os_mbuf_pool, 0);
+    }
+  } while (sdu_rx_data == NULL);
+
+  os_mbuf_append(sdu_rx_data, value, len);
+
+  // print_mbuf_data(sdu_rx_data);
+
+  rc = ble_l2cap_send(chan, sdu_rx_data);
+
+  while (rc == BLE_HS_ESTALLED) {
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    rc = ble_l2cap_send(chan, sdu_rx_data);
+  }
+  if (rc == 0) {
+    MODLOG_DFLT(INFO, "Data sent successfully");
+  } else {
+    MODLOG_DFLT(INFO, "Data sending failed, rc = %d", rc);
+    os_mbuf_free_chain(sdu_rx_data);
+  }
+}
 
 static int bleprph_l2cap_coc_accept(uint16_t conn_handle, uint16_t peer_mtu,
                                     struct ble_l2cap_chan *chan) {
@@ -58,6 +95,7 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
       assert(0);
     }
 
+    coc_chan = event->connect.chan;
     ESP_LOGI(TAG,
              "LE COC connected, conn: %d, chan: %p, psm: 0x%02x,"
              " scid: 0x%04x, "
@@ -67,26 +105,24 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
              chan_info.scid, chan_info.dcid, chan_info.our_l2cap_mtu,
              chan_info.our_coc_mtu, chan_info.peer_l2cap_mtu,
              chan_info.peer_coc_mtu);
-
     return 0;
 
   case BLE_L2CAP_EVENT_COC_DISCONNECTED:
+    coc_chan = NULL;
     ESP_LOGI(TAG, "LE CoC disconnected, chan: %p\n", event->disconnect.chan);
-
     return 0;
 
   case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
     if (event->receive.sdu_rx != NULL) {
       MODLOG_DFLT(INFO,
                   "Data received (%d bytes): ", event->receive.sdu_rx->om_len);
-      for (int i = 0; i < event->receive.sdu_rx->om_len; i++) {
-        ESP_LOGI(TAG, "%d ", event->receive.sdu_rx->om_data[i]);
-      }
       os_mbuf_free(event->receive.sdu_rx);
     }
     fflush(stdout);
     bleprph_l2cap_coc_accept(event->receive.conn_handle, peer_sdu_size,
                              event->receive.chan);
+
+    blecent_l2cap_coc_send_data(coc_chan);
     return 0;
 
   case BLE_L2CAP_EVENT_COC_ACCEPT:
