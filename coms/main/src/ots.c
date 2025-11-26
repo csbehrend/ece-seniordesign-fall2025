@@ -3,6 +3,7 @@
 #include "host/ble_att.h"
 #include "host/ble_gatt.h"
 #include "host/ble_hs_mbuf.h"
+#include "host/ble_uuid.h"
 #include "os/os_mbuf.h"
 #include "ots_store.h"
 #include <stdbool.h>
@@ -131,6 +132,7 @@ int object_type_chr_access(uint16_t conn_handle, uint16_t attr_handle,
   assert(uuid);
 
   switch (uuid->type) {
+  /*
   case BLE_UUID_TYPE_16:
     rc = os_mbuf_append(ctxt->om, &((ble_uuid16_t *)uuid)->value,
                         sizeof(((ble_uuid16_t *)uuid)->value));
@@ -139,6 +141,7 @@ int object_type_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     rc = os_mbuf_append(ctxt->om, &((ble_uuid32_t *)uuid)->value,
                         sizeof(((ble_uuid32_t *)uuid)->value));
     break;
+    */
   case BLE_UUID_TYPE_128:
     rc = os_mbuf_append(ctxt->om, &((ble_uuid128_t *)uuid)->value,
                         sizeof(((ble_uuid128_t *)uuid)->value));
@@ -368,15 +371,19 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
   switch (request.op) {
   case OLCP_OP_FIRST:
     g_obj_current = 0;
+    ESP_LOGI(TAG, "object_list_control_point_chr_access: FIRST");
     goto indicate;
   case OLCP_OP_LAST:
     g_obj_current = g_obj_array_len - 1;
+    ESP_LOGI(TAG, "object_list_control_point_chr_access: LAST");
     goto indicate;
   case OLCP_OP_PREVIOUS:
     g_obj_current = (g_obj_current - 1) % g_obj_array_len;
+    ESP_LOGI(TAG, "object_list_control_point_chr_access: PREVIOUS");
     goto indicate;
   case OLCP_OP_NEXT:
     g_obj_current = (g_obj_current + 1) % g_obj_array_len;
+    ESP_LOGI(TAG, "object_list_control_point_chr_access: NEXT");
     goto indicate;
   default:
     response.result = OACP_RESULT_UNSUPP_OP;
