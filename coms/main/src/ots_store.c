@@ -24,8 +24,7 @@ static ots_object_t test[] = {
      .type =
          BLE_UUID128_DECLARE(0xc1, 0x8c, 0xe9, 0x55, 0x0c, 0xf6, 0xec, 0x8a,
                              0x2d, 0x44, 0xf3, 0x30, 0x8d, 0x70, 0x5d, 0xc1),
-     .size.decoded = {.current_size = sizeof(m_testval),
-                      .allocated_size = sizeof(m_testval)},
+     .size.decoded = {.current_size = sizeof(m_testval), .allocated_size = 67},
      .id.luid = {0xce, 0x70, 0xe2, 0xf8, 0x8d, 0xc1},
      .properties.decoded = {.read = 1},
      .cb_func = {.read = testval_read}},
@@ -34,8 +33,7 @@ static ots_object_t test[] = {
      .type =
          BLE_UUID128_DECLARE(0xab, 0x77, 0xb7, 0xdb, 0x9f, 0x65, 0x4d, 0x9c,
                              0x7f, 0x4b, 0xc5, 0xf4, 0xfb, 0x51, 0xe7, 0x3b),
-     .size.decoded = {.current_size = sizeof(m_array),
-                      .allocated_size = sizeof(m_array)},
+     .size.decoded = {.current_size = sizeof(m_array), .allocated_size = 6767},
      .id.luid = {0x9e, 0x98, 0x42, 0x13, 0x78},
      .properties.decoded = {.read = 1, .write = 1},
      .cb_func = {.read = bigarr_read}}};

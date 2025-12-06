@@ -23,6 +23,9 @@ CHR_DEFINE_UUID16(object_action_control_point, 0x2AC5);
 CHR_DEFINE_UUID16(object_list_control_point, 0x2AC6);
 // CHR_DEFINE_UUID16(object_list_filter, 0x2AC7);
 // CHR_DEFINE_UUID16(object_changed, 0x2AC8);
+//
+bool object_action_control_point_ind_status = false;
+bool object_list_control_point_ind_status = false;
 
 // static const ots_feature_t ots_feature_chr_value = {
 // .decoded = {.oacp.decoded = {.read = 1, .write = 1}}};
@@ -325,7 +328,6 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
   int rc = 0;
   olcp_request_t request = {0};
   olcp_response_t response = {0};
-  response.rc = OLCP_OP_RESPONSE_CODE;
   struct os_mbuf *txom = NULL;
 
   // Will always be a write
@@ -354,9 +356,8 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
   uint16_t len = 0;
   rc = ble_hs_mbuf_to_flat(ctxt->om, &request, sizeof(request), &len);
   if (rc) {
-    response.result = OACP_RESULT_INSUFFICIENT_RESOURCES;
     ESP_LOGE(TAG, "object_list_control_point_chr_access: bad mbuf read");
-    goto indicate;
+    return BLE_ATT_ERR_INSUFFICIENT_RES;
   }
 
   assert(len == sizeof(request));
@@ -370,20 +371,28 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
   response.result = OACP_RESULT_SUCCESS;
   switch (request.op) {
   case OLCP_OP_FIRST:
-    g_obj_current = 0;
     ESP_LOGI(TAG, "object_list_control_point_chr_access: FIRST");
+    g_obj_current = 0;
     goto indicate;
   case OLCP_OP_LAST:
-    g_obj_current = g_obj_array_len - 1;
     ESP_LOGI(TAG, "object_list_control_point_chr_access: LAST");
+    g_obj_current = g_obj_array_len - 1;
     goto indicate;
   case OLCP_OP_PREVIOUS:
-    g_obj_current = (g_obj_current - 1) % g_obj_array_len;
     ESP_LOGI(TAG, "object_list_control_point_chr_access: PREVIOUS");
+    if (!g_obj_current) {
+      response.result = OLCP_RESULT_OUT_OF_BOUNDS;
+      goto indicate;
+    }
+    g_obj_current--;
     goto indicate;
   case OLCP_OP_NEXT:
-    g_obj_current = (g_obj_current + 1) % g_obj_array_len;
     ESP_LOGI(TAG, "object_list_control_point_chr_access: NEXT");
+    if (g_obj_current >= g_obj_array_len - 1) {
+      response.result = OLCP_RESULT_OUT_OF_BOUNDS;
+      goto indicate;
+    }
+    g_obj_current++;
     goto indicate;
   default:
     response.result = OACP_RESULT_UNSUPP_OP;
@@ -395,11 +404,18 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
   }
 
 indicate:
+  if (!object_list_control_point_ind_status) {
+    ESP_LOGI(
+        TAG,
+        "object_list_control_point_chr_access: not subscribed to indications");
+    return rc;
+  }
+
   txom = ble_hs_mbuf_from_flat(&response, sizeof(response));
   if (!txom) {
     return BLE_ATT_ERR_INSUFFICIENT_RES;
   }
-  ble_gatts_indicate_custom(conn_handle, object_action_control_point_chr_handle,
+  ble_gatts_indicate_custom(conn_handle, object_list_control_point_chr_handle,
                             txom);
   return rc;
 }

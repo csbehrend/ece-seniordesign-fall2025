@@ -223,6 +223,27 @@ void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg) {
   }
 }
 
+void gatt_svr_subscribe_cb(struct ble_gap_event *event) {
+  /* Check connection handle */
+  if (event->subscribe.conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+    ESP_LOGI(TAG, "subscribe event; conn_handle=%d attr_handle=%d",
+             event->subscribe.conn_handle, event->subscribe.attr_handle);
+  } else {
+    ESP_LOGI(TAG, "subscribe by nimble stack; attr_handle=%d",
+             event->subscribe.attr_handle);
+  }
+
+  /* Check attribute handle */
+  if (event->subscribe.attr_handle == object_list_control_point_chr_handle) {
+    object_list_control_point_ind_status = event->subscribe.cur_indicate;
+    ESP_LOGI(TAG, "SUBSCRIBED TO OLCP");
+  } else if (event->subscribe.attr_handle ==
+             object_action_control_point_chr_handle) {
+    object_action_control_point_ind_status = event->subscribe.cur_indicate;
+    ESP_LOGI(TAG, "SUBSCRIBED TO OACP");
+  }
+}
+
 int gatt_svr_init(void) {
   int rc;
 

@@ -36,6 +36,9 @@ CHR_DECLARE_UUID16(object_list_control_point);
                      BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_INDICATE),          \
       GATT_SVC_ENTRY_END()
 
+extern bool object_action_control_point_ind_status;
+extern bool object_list_control_point_ind_status;
+
 typedef union PACKED_ATTR {
   struct PACKED_ATTR {
     bool create : 1;
@@ -180,7 +183,6 @@ typedef struct PACKED_ATTR {
 } olcp_request_t;
 
 typedef struct PACKED_ATTR {
-  olcp_opcode_t rc;
   olcp_opcode_t op;
   olcp_result_code_t result;
 } olcp_response_t;

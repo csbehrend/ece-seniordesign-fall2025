@@ -24,6 +24,7 @@
 #include "ble.h"
 #include "bleprph.h"
 #include "coc.h"
+#include "gatt_svc.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
 #include "led.h"
@@ -223,6 +224,7 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg) {
                 event->subscribe.reason, event->subscribe.prev_notify,
                 event->subscribe.cur_notify, event->subscribe.prev_indicate,
                 event->subscribe.cur_indicate);
+    gatt_svr_subscribe_cb(event);
     return 0;
 
   case BLE_GAP_EVENT_MTU:
