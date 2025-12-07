@@ -31,6 +31,7 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "ots.h"
+#include "ots_store.h"
 #include "services/gap/ble_svc_gap.h"
 
 static const char *tag = "NimBLE_BLE_PRPH";
@@ -318,8 +319,8 @@ void bleprph_host_task(void *param) {
 
 void init_ble(void) {
   int rc;
-
   led_init();
+  ots_store_init();
 
   bleprph_l2cap_coc_mem_init();
 

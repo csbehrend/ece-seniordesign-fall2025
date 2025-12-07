@@ -1,11 +1,16 @@
 #include "ots.h"
+#include "coc.h"
 #include "common.h"
+#include "esp_log.h"
+#include "freertos/idf_additions.h"
+#include "freertos/projdefs.h"
 #include "host/ble_att.h"
 #include "host/ble_gatt.h"
 #include "host/ble_hs_mbuf.h"
 #include "host/ble_uuid.h"
 #include "os/os_mbuf.h"
 #include "ots_store.h"
+#include "portmacro.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -23,7 +28,6 @@ CHR_DEFINE_UUID16(object_action_control_point, 0x2AC5);
 CHR_DEFINE_UUID16(object_list_control_point, 0x2AC6);
 // CHR_DEFINE_UUID16(object_list_filter, 0x2AC7);
 // CHR_DEFINE_UUID16(object_changed, 0x2AC8);
-//
 bool object_action_control_point_ind_status = false;
 bool object_list_control_point_ind_status = false;
 
@@ -40,6 +44,36 @@ void verify_conn_handle(uint16_t conn_handle, uint16_t attr_handle) {
     ESP_LOGI(TAG, "characteristic read by nimble stack; attr_handle=%d",
              attr_handle);
   }
+}
+
+static bool oacp_request_is_valid_size(oacp_request_t *request,
+                                       uint16_t length) {
+  assert(request != NULL);
+  if (length < sizeof(request->op)) {
+    return false;
+  }
+
+  switch (request->op) {
+  case OACP_OP_READ:
+  case OACP_OP_CHECKSUM:
+    if (length !=
+        sizeof(request->op) + sizeof(request->parameter.checksum_read_param)) {
+      return false;
+    }
+    break;
+  case OACP_OP_WRITE:
+    if (length !=
+        sizeof(request->op) + sizeof(request->parameter.write_param)) {
+      return false;
+    }
+    break;
+  default:
+    ESP_LOGE(TAG, "oacp_request_is_valid_size: invalid OACP opcode %d",
+             request->op);
+    return false;
+  }
+
+  return true;
 }
 
 // Return true if supported
@@ -66,32 +100,28 @@ int ots_feature_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
 
-  // Handle access events
-  switch (ctxt->op) {
-  case BLE_GATT_ACCESS_OP_READ_CHR:
-    verify_conn_handle(conn_handle, attr_handle);
-
-    // Verify attribute handle
-    if (attr_handle == ots_feature_chr_handle) {
-      rc = os_mbuf_append(ctxt->om, &ots_feature_chr_value,
-                          sizeof(ots_feature_chr_value));
-      return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
-    }
-    goto error;
-  default:
-    goto error;
+  if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
+    ESP_LOGE(TAG, "ots_feature_chr_access: unexpected operation, opcode: %d",
+             ctxt->op);
+    return BLE_ATT_ERR_UNLIKELY;
   }
 
-error:
-  ESP_LOGE(TAG, "ots_feature_chr_access: unexpected operation, opcode: %d",
-           ctxt->op);
-  return BLE_ATT_ERR_UNLIKELY;
+  verify_conn_handle(conn_handle, attr_handle);
+
+  // Verify attribute handle
+  if (attr_handle != ots_feature_chr_handle) {
+    ESP_LOGE(TAG, "ots_feature_chr_access: bad attr_handle");
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  rc = os_mbuf_append(ctxt->om, &ots_feature_chr_value,
+                      sizeof(ots_feature_chr_value));
+  return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_name_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
-  ots_object_t *obj = CURRENT_OBJ();
 
   // Handle access events
   if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
@@ -107,14 +137,19 @@ int object_name_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
   }
 
+  ots_object_t *obj = CURRENT_OBJ();
+  if (lockOtsTable() != pdTRUE) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
   rc = os_mbuf_append(ctxt->om, obj->name, obj->name_len);
+  unlockOtsTable();
   return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_type_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
-  ots_object_t *obj = CURRENT_OBJ();
 
   // Handle access events
   if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
@@ -130,6 +165,10 @@ int object_type_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
   }
 
+  ots_object_t *obj = CURRENT_OBJ();
+  if (lockOtsTable() != pdTRUE) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
   const ble_uuid_t *uuid = obj->type;
   assert(uuid);
 
@@ -150,16 +189,17 @@ int object_type_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     break;
   default:
     ESP_LOGE(TAG, "object_type_chr_access: bad uuid type %d", obj->type->type);
+    unlockOtsTable();
     return BLE_ATT_ERR_UNLIKELY;
   }
 
+  unlockOtsTable();
   return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_size_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
-  ots_object_t *obj = CURRENT_OBJ();
 
   // Handle access events
   if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
@@ -175,14 +215,18 @@ int object_size_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
   }
 
+  ots_object_t *obj = CURRENT_OBJ();
+  if (lockOtsTable() != pdTRUE) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
   rc = os_mbuf_append(ctxt->om, &obj->size, sizeof(obj->size));
+  unlockOtsTable();
   return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_id_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                          struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
-  ots_object_t *obj = CURRENT_OBJ();
 
   // Handle access events
   if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
@@ -198,14 +242,18 @@ int object_id_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
   }
 
+  ots_object_t *obj = CURRENT_OBJ();
+  if (lockOtsTable() != pdTRUE) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
   rc = os_mbuf_append(ctxt->om, &obj->id.luid, sizeof(obj->id.luid));
+  unlockOtsTable();
   return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 int object_properties_chr_access(uint16_t conn_handle, uint16_t attr_handle,
                                  struct ble_gatt_access_ctxt *ctxt, void *arg) {
   int rc = 0;
-  ots_object_t *obj = CURRENT_OBJ();
 
   // Handle access events
   if (ctxt->op != BLE_GATT_ACCESS_OP_READ_CHR) {
@@ -222,7 +270,12 @@ int object_properties_chr_access(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
   }
 
+  ots_object_t *obj = CURRENT_OBJ();
+  if (lockOtsTable() != pdTRUE) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
   rc = os_mbuf_append(ctxt->om, &obj->properties, sizeof(obj->properties));
+  unlockOtsTable();
   return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
@@ -233,7 +286,6 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
   int rc = 0;
   oacp_request_t request = {0};
   oacp_response_t response = {0};
-  response.rc = OACP_OP_RESPONSE;
   struct os_mbuf *txom = NULL;
 
   // Will always be a write
@@ -279,34 +331,12 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
              request.op);
     goto indicate;
   }
-
-  // TODO: add length and object property check (currently ignored)
-  switch (request.op) {
-  case OACP_OP_READ:
-    response.result = OACP_RESULT_SUCCESS;
-    if (len !=
-        sizeof(request.op) + sizeof(request.parameter.checksum_read_param)) {
-      response.result = OACP_RESULT_INV_PARAM;
-      ESP_LOGE(TAG,
-               "object_action_control_point_chr_access: op_read bad len %d",
-               len);
-      goto indicate;
-    }
-    break;
-    /*
-    case OACP_OP_CREATE:
-    case OACP_OP_DELETE = 0x02,
-    case OACP_OP_CHECKSUM = 0x03,
-    case OACP_OP_EXECUTE = 0x04,
-    case OACP_OP_READ = 0x05,
-    case OACP_OP_WRITE = 0x06,
-    */
-  default:
-    response.result = OACP_RESULT_UNSUPP_OP;
-    ESP_LOGE(TAG,
-             "object_action_control_point_chr_access: invalid OACP opcode %d "
-             "past support check ",
-             request.op);
+  if (!oacp_request_is_valid_size(&request, len)) {
+    response.result = OACP_RESULT_INV_PARAM;
+    ESP_LOGE(
+        TAG,
+        "object_action_control_point_chr_access: invalid parameter size %d",
+        len);
     goto indicate;
   }
 
@@ -403,9 +433,8 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
 
 indicate:
   if (!object_list_control_point_ind_status) {
-    ESP_LOGI(
-        TAG,
-        "object_list_control_point_chr_access: not subscribed to indications");
+    ESP_LOGI(TAG, "object_list_control_point_chr_access: not subscribed to "
+                  "indications");
     return rc;
   }
 

@@ -1,5 +1,4 @@
 dependencies:
   espressif/led_strip: "^2.4.1"
-  espressif/libsodium: ^1.0.20~2
   nimble_peripheral_utils:
       path: ${IDF_PATH}/examples/bluetooth/nimble/common/nimble_peripheral_utils

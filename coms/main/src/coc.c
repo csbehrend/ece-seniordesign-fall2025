@@ -1,5 +1,8 @@
 #include "common.h"
 #include "esp_log.h"
+#include "freertos/idf_additions.h"
+#include "freertos/projdefs.h"
+#include "host/ble_l2cap.h"
 #include "nvs_flash.h"
 /* BLE */
 #include "coc.h"
@@ -7,13 +10,25 @@
 #include "host/util/util.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
+#include "ots_store.h"
+#include "portmacro.h"
 #include "services/gap/ble_svc_gap.h"
+#include <stdint.h>
+#include <string.h>
 
 static os_membuf_t sdu_coc_mem[COC_MBUF_MEMPOOL_SIZE];
 static struct os_mempool sdu_coc_mbuf_mempool;
 static struct os_mbuf_pool sdu_os_mbuf_pool;
 static uint16_t peer_sdu_size;
-static struct ble_l2cap_chan *coc_chan = NULL;
+struct ble_l2cap_chan *coc_chan = NULL;
+static bool holding_channel = true;
+static uint16_t coc_event_timeout = pdMS_TO_TICKS(10000);
+
+QueueHandle_t coc_queue = NULL;
+SemaphoreHandle_t coc_processing = NULL;
+SemaphoreHandle_t coc_channel_ready = NULL;
+SemaphoreHandle_t coc_operation_initiated = NULL;
+QueueHandle_t coc_forward_event = NULL;
 
 static void blecent_l2cap_coc_send_data(struct ble_l2cap_chan *chan) {
   struct os_mbuf *sdu_rx_data;
@@ -51,8 +66,8 @@ static void blecent_l2cap_coc_send_data(struct ble_l2cap_chan *chan) {
   }
 }
 
-static int bleprph_l2cap_coc_accept(uint16_t conn_handle, uint16_t peer_mtu,
-                                    struct ble_l2cap_chan *chan) {
+int bleprph_l2cap_coc_accept(uint16_t conn_handle, uint16_t peer_mtu,
+                             struct ble_l2cap_chan *chan) {
   struct os_mbuf *sdu_rx;
 
   ESP_LOGI(TAG, "LE CoC accepting, chan: 0x%08lx, peer_mtu %d\n",
@@ -84,6 +99,26 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
   struct ble_l2cap_chan_info chan_info;
   ESP_LOGI(TAG, "LE COC callback: %d\n");
 
+  int rc = 0;
+
+  bool claimedEvent = (xSemaphoreTake(coc_operation_initiated, 0) == pdTRUE);
+
+  if (!claimedEvent && !holding_channel) {
+    if (event->type == BLE_L2CAP_EVENT_COC_DISCONNECTED) {
+      xQueueReset(coc_forward_event);
+      rc = xQueueSend(coc_forward_event, event, 0);
+      assert(rc == pdPASS);
+      goto handler;
+    }
+    if (xQueueSend(coc_forward_event, event, 0) != pdPASS) {
+      ESP_LOGE(TAG,
+               "bleprph_l2cap_coc_event_cb: forced to drop coc event type %d",
+               event->type);
+    }
+    return 0;
+  }
+
+handler:
   switch (event->type) {
   case BLE_L2CAP_EVENT_COC_CONNECTED:
     if (event->connect.status) {
@@ -105,13 +140,19 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
              chan_info.scid, chan_info.dcid, chan_info.our_l2cap_mtu,
              chan_info.our_coc_mtu, chan_info.peer_l2cap_mtu,
              chan_info.peer_coc_mtu);
+
+    holding_channel = false;
+    xSemaphoreGive(coc_channel_ready);
     return 0;
 
   case BLE_L2CAP_EVENT_COC_DISCONNECTED:
+    rc = xSemaphoreTake(coc_channel_ready, portMAX_DELAY);
+    assert(rc == pdTRUE);
+    holding_channel = true;
     coc_chan = NULL;
     ESP_LOGI(TAG, "LE CoC disconnected, chan: %p\n", event->disconnect.chan);
     return 0;
-
+  /*
   case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
     if (event->receive.sdu_rx != NULL) {
       MODLOG_DFLT(INFO,
@@ -131,11 +172,71 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
                              event->accept.peer_sdu_size, event->accept.chan);
     MODLOG_DFLT(INFO, "Peer SDU Size = %d bytes", peer_sdu_size);
     return 0;
-
+  */
   default:
     return 0;
   }
 }
+
+int await_coc_event(struct ble_l2cap_event *event) {
+  // Set struct to zero
+  memset(event, 0, sizeof(*event));
+  return xQueueReceive(coc_forward_event, event, coc_event_timeout);
+}
+
+struct ble_l2cap_chan *coc_acquire_channel() {
+  if (xSemaphoreTake(coc_operation_initiated, pdMS_TO_TICKS(500) != pdTRUE)) {
+    return NULL;
+  }
+  if (xSemaphoreTake(coc_channel_ready, pdMS_TO_TICKS(500) != pdTRUE)) {
+    xSemaphoreGive(coc_operation_initiated);
+    return NULL;
+  }
+  assert(coc_chan != NULL);
+  return coc_chan;
+}
+
+void coc_release_channel() {
+  xSemaphoreGive(coc_operation_initiated);
+  xSemaphoreGive(coc_channel_ready);
+}
+void coc_force_close() {
+  assert(coc_chan != NULL);
+  ble_l2cap_disconnect(coc_chan);
+  coc_chan = NULL;
+  coc_release_channel();
+}
+
+struct os_mbuf *alloc_coc_mbuf() {
+  struct os_mbuf *sdu_rx_data;
+  sdu_rx_data = os_mbuf_get_pkthdr(&sdu_os_mbuf_pool, 0);
+
+  while (sdu_rx_data == NULL) {
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+    sdu_rx_data = os_mbuf_get_pkthdr(&sdu_os_mbuf_pool, 0);
+  }
+
+  return sdu_rx_data;
+}
+
+void ble_coc_worker_task(void *pvParameters) {
+  assert(coc_processing != NULL);
+
+  for (;;) {
+    int rc = 0;
+    coc_operation_t operation;
+
+    // Allow OACP to request operation
+    xSemaphoreGive(coc_processing);
+    rc = xQueueReceive(coc_queue, &operation, portMAX_DELAY);
+    assert(rc == pdTRUE);
+    ESP_LOGI(TAG, "ble_coc_worker_task: received coc operation from OACP");
+
+    oacp_request_worker(operation.conn_handle, operation.object,
+                        operation.request);
+  }
+}
+
 void bleprph_l2cap_coc_mem_init(void) {
   int rc;
   rc = os_mempool_init(&sdu_coc_mbuf_mempool, COC_BUF_COUNT,
@@ -144,4 +245,12 @@ void bleprph_l2cap_coc_mem_init(void) {
   rc = os_mbuf_pool_init(&sdu_os_mbuf_pool, &sdu_coc_mbuf_mempool,
                          COC_MBUF_MEMBLOCK_SIZE, COC_BUF_COUNT);
   assert(rc == 0);
+  coc_queue = xQueueCreate(3, sizeof(coc_operation_t));
+  assert(coc_queue != NULL);
+  coc_processing = xSemaphoreCreateBinary();
+  assert(coc_processing != NULL);
+  coc_channel_ready = xSemaphoreCreateBinary();
+  assert(coc_channel_ready != NULL);
+  coc_operation_initiated = xSemaphoreCreateBinary();
+  assert(coc_operation_initiated != NULL);
 }

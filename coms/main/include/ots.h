@@ -149,7 +149,6 @@ typedef struct PACKED_ATTR {
 } oacp_request_t;
 
 typedef struct PACKED_ATTR {
-  oacp_opcode_t rc;
   oacp_opcode_t op;
   oacp_result_code_t result;
 } oacp_response_t;
