@@ -243,6 +243,11 @@ void gatt_svr_subscribe_cb(struct ble_gap_event *event) {
              object_action_control_point_chr_handle) {
     object_action_control_point_ind_status = event->subscribe.cur_indicate;
     ESP_LOGI(TAG, "SUBSCRIBED TO OACP");
+  } else if (event->subscribe.attr_handle == auto_state_chr_handle) {
+    auto_state_chr_conn_handle = event->subscribe.conn_handle;
+    auto_state_chr_conn_handle_inited = true;
+    auto_state_ind_status = event->subscribe.cur_indicate;
+    ESP_LOGI(TAG, "SUBSCRIBED TO GLOVE STATE");
   }
 }
 

@@ -21,6 +21,7 @@
 #include "host/ble_sm.h"
 #include "nvs_flash.h"
 /* BLE */
+#include "automation.h"
 #include "ble.h"
 #include "bleprph.h"
 #include "coc.h"
@@ -321,6 +322,7 @@ void init_ble(void) {
   int rc;
   led_init();
   ots_store_init();
+  init_glove_automation();
 
   bleprph_l2cap_coc_mem_init();
 
