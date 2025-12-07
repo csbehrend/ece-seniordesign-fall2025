@@ -32,8 +32,7 @@ bool object_list_control_point_ind_status = false;
 static const ots_feature_t ots_feature_chr_value = {
     .decoded = {.oacp.decoded = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}};
 
-static inline void verify_conn_handle(uint16_t conn_handle,
-                                      uint16_t attr_handle) {
+void verify_conn_handle(uint16_t conn_handle, uint16_t attr_handle) {
   if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
     ESP_LOGI(TAG, "characteristic read; conn_handle=%d attr_handle=%d",
              conn_handle, attr_handle);
@@ -355,12 +354,11 @@ int object_list_control_point_chr_access(uint16_t conn_handle,
   // Read request
   uint16_t len = 0;
   rc = ble_hs_mbuf_to_flat(ctxt->om, &request, sizeof(request), &len);
-  if (rc) {
-    ESP_LOGE(TAG, "object_list_control_point_chr_access: bad mbuf read");
+  if (rc || len != sizeof(request)) {
+    ESP_LOGE(TAG, "object_list_control_point_chr_access: bad mbuf read or bad "
+                  "request size");
     return BLE_ATT_ERR_INSUFFICIENT_RES;
   }
-
-  assert(len == sizeof(request));
 
   // Update the response struct
   response.op = request.op;

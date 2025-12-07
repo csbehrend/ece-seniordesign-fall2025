@@ -17,6 +17,7 @@
  * under the License.
  */
 
+#include "automation.h"
 #include "bleprph.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
@@ -85,6 +86,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
                 }},
     },
     OTS_SERVICE_ENTRY(),
+    AUTOMATION_SERVICE_ENTRY(),
     LED_SERVICE_ENTRY(),
     NRF_SERVICE_ENTRY(),
     {

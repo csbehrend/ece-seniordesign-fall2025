@@ -33,6 +33,7 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 
+void verify_conn_handle(uint16_t conn_handle, uint16_t attr_handle);
 /* Defines */
 #define TAG "ReadyRightGlove_Server"
 #define DEVICE_NAME "ReadyRightGlove"
