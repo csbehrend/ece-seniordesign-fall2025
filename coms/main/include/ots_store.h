@@ -24,13 +24,16 @@ typedef int oacp_callback_fn(uint16_t conn_handle, uint16_t attr_handle,
 typedef int oacp_read_cb(ots_object_t *obj, struct os_mbuf *buf,
                          uint32_t offset, uint32_t len);
 
+typedef int oacp_write_cb(ots_object_t *obj, struct os_mbuf *buf,
+                          uint32_t offset, uint32_t len);
+
 typedef struct {
   oacp_callback_fn *create;
   oacp_callback_fn *delete;
   oacp_callback_fn *checksum;
   oacp_callback_fn *execute;
   oacp_read_cb *read;
-  oacp_callback_fn *write;
+  oacp_write_cb *write;
 } ots_object_cb_t;
 
 struct ots_object_s {

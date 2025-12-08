@@ -26,6 +26,8 @@ extern SemaphoreHandle_t coc_channel_ready;
 extern SemaphoreHandle_t coc_operation_initiated;
 extern QueueHandle_t coc_forward_event;
 
+extern uint16_t peer_sdu_size;
+
 typedef struct {
   int16_t conn_handle;
   ots_object_t *object;
@@ -42,5 +44,7 @@ void coc_force_close();
 
 int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg);
 void bleprph_l2cap_coc_mem_init(void);
+int bleprph_l2cap_coc_accept(uint16_t conn_handle, uint16_t peer_mtu,
+                             struct ble_l2cap_chan *chan);
 
 #endif // COC_H

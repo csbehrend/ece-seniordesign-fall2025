@@ -20,10 +20,10 @@
 static os_membuf_t sdu_coc_mem[COC_MBUF_MEMPOOL_SIZE];
 static struct os_mempool sdu_coc_mbuf_mempool;
 static struct os_mbuf_pool sdu_os_mbuf_pool;
-static uint16_t peer_sdu_size;
+uint16_t peer_sdu_size = 0;
 struct ble_l2cap_chan *coc_chan = NULL;
 static bool holding_channel = true;
-static uint16_t coc_event_timeout = pdMS_TO_TICKS(10000);
+static uint16_t coc_event_timeout = pdMS_TO_TICKS(2000);
 
 QueueHandle_t coc_queue = NULL;
 SemaphoreHandle_t coc_processing = NULL;
@@ -82,48 +82,13 @@ int bleprph_l2cap_coc_accept(uint16_t conn_handle, uint16_t peer_mtu,
   return ble_l2cap_recv_ready(chan, sdu_rx);
 }
 
-/**
- * The nimble host executes this callback when a L2CAP  event occurs.  The
- * application associates a L2CAP event callback with each connection that is
- * established.  blecent_l2cap_coc uses the same callback for all connections.
- *
- * @param event                 The event being signalled.
- * @param arg                   Application-specified argument; unused by
- *                                  blecent_l2cap_coc.
- *
- * @return                      0 if the application successfully handled the
- *                                  event; nonzero on failure.  The semantics
- *                                  of the return code is specific to the
- *                                  particular L2CAP event being signalled.
- */
-int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
+static int default_coc_event_cb(struct ble_l2cap_event *event) {
   struct ble_l2cap_chan_info chan_info;
-  ESP_LOGI(TAG, "LE COC callback: %d\n");
+  ESP_LOGI(TAG, "LE COC default callback: %d\n");
 
   int rc = 0;
 
-  bool claimedEvent = (xSemaphoreTake(coc_operation_initiated, 0) == pdTRUE);
-
-  if (!claimedEvent && !holding_channel) {
-    if (event->type == BLE_L2CAP_EVENT_COC_DISCONNECTED) {
-      xQueueReset(coc_forward_event);
-      rc = xQueueSend(coc_forward_event, event, 0);
-      assert(rc == pdPASS);
-      goto handler;
-    }
-    if (xQueueSend(coc_forward_event, event, 0) != pdPASS) {
-      ESP_LOGE(TAG,
-               "bleprph_l2cap_coc_event_cb: forced to drop coc event type %d",
-               event->type);
-    }
-    return 0;
-  }
-
-  if (claimedEvent) {
-    xSemaphoreGive(coc_operation_initiated);
-  }
-
-handler:
+  assert(event != NULL);
   switch (event->type) {
   case BLE_L2CAP_EVENT_COC_CONNECTED:
     if (event->connect.status) {
@@ -157,20 +122,6 @@ handler:
     coc_chan = NULL;
     ESP_LOGI(TAG, "LE CoC disconnected, chan: %p\n", event->disconnect.chan);
     return 0;
-    /*
-    case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
-      if (event->receive.sdu_rx != NULL) {
-        MODLOG_DFLT(INFO,
-                    "Data received (%d bytes): ",
-    event->receive.sdu_rx->om_len); os_mbuf_free(event->receive.sdu_rx);
-      }
-      fflush(stdout);
-      bleprph_l2cap_coc_accept(event->receive.conn_handle, peer_sdu_size,
-                               event->receive.chan);
-
-      blecent_l2cap_coc_send_data(coc_chan);
-      return 0;
-    */
 
   case BLE_L2CAP_EVENT_COC_ACCEPT:
     peer_sdu_size = event->accept.peer_sdu_size;
@@ -185,9 +136,46 @@ handler:
   }
 }
 
+/**
+ * The nimble host executes this callback when a L2CAP  event occurs.  The
+ * application associates a L2CAP event callback with each connection that is
+ * established.  blecent_l2cap_coc uses the same callback for all connections.
+ *
+ * @param event                 The event being signalled.
+ * @param arg                   Application-specified argument; unused by
+ *                                  blecent_l2cap_coc.
+ *
+ * @return                      0 if the application successfully handled the
+ *                                  event; nonzero on failure.  The semantics
+ *                                  of the return code is specific to the
+ *                                  particular L2CAP event being signalled.
+ */
+int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
+  ESP_LOGI(TAG, "LE COC callback dispatcher: %d\n");
+
+  int rc = 0;
+
+  bool claimedEvent = (xSemaphoreTake(coc_operation_initiated, 0) == pdTRUE);
+
+  if (!claimedEvent && !holding_channel) {
+    rc = xQueueSend(coc_forward_event, event, 0);
+    assert(rc == pdPASS);
+    if (event->type == BLE_L2CAP_EVENT_COC_DISCONNECTED) {
+      // Will stall until ready
+      return default_coc_event_cb(event);
+    }
+    return 0;
+  }
+
+  if (claimedEvent) {
+    xSemaphoreGive(coc_operation_initiated);
+  }
+  return default_coc_event_cb(event);
+}
+
 int await_coc_event(struct ble_l2cap_event *event) {
   // Set struct to zero
-  memset(event, 0, sizeof(*event));
+  // memset(event, 0, sizeof(*event));
   return xQueueReceive(coc_forward_event, event, coc_event_timeout);
 }
 
@@ -256,6 +244,9 @@ void bleprph_l2cap_coc_mem_init(void) {
 
   coc_queue = xQueueCreate(3, sizeof(coc_operation_t));
   assert(coc_queue != NULL);
+
+  coc_forward_event = xQueueCreate(3, sizeof(struct ble_l2cap_event));
+  assert(coc_forward_event != NULL);
 
   // Gives when ready
   coc_processing = xSemaphoreCreateBinary();
