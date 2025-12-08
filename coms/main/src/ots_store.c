@@ -25,7 +25,7 @@ static uint8_t m_array[200] = {0};
 
 static oacp_read_cb generic_mem_read;
 
-static const TickType_t wait_ticks = 10;
+static const TickType_t wait_ticks = pdTICKS_TO_MS(100);
 
 static const char testval_name[] = "TestVal";
 static const char bigarr_name[] = "BigArr";
@@ -77,27 +77,38 @@ void unlockOtsTable() {
 }
 
 static int oacp_indicate(uint16_t conn_handle, oacp_response_t *response) {
+  int rc = 0;
   assert(response != NULL);
   struct os_mbuf *txom = ble_hs_mbuf_from_flat(response, sizeof(*response));
   if (!txom) {
     return BLE_ATT_ERR_INSUFFICIENT_RES;
   }
-  return ble_gatts_indicate_custom(
-      conn_handle, object_action_control_point_chr_handle, txom);
+  rc = ble_gatts_indicate_custom(conn_handle,
+                                 object_action_control_point_chr_handle, txom);
+  if (response->result == OACP_RESULT_SUCCESS) {
+    ESP_LOGI(TAG, "oacp_indicate: success, start operation");
+  } else {
+    ESP_LOGE(TAG, "oacp_indicate: error id %d, cancel operation",
+             response->result);
+  }
+  return rc;
 }
 
 void ots_store_init() {
-  g_ots_mutex = xSemaphoreCreateMutex();
+  g_ots_mutex = xSemaphoreCreateBinary();
   if (g_ots_mutex == NULL) {
     ESP_LOGE(TAG, "Failed to create mutex for OTS object table");
     assert(0);
     return;
   }
+  unlockOtsTable();
 }
 
 static int oacp_read_operation(uint16_t conn_handle, ots_object_t *object,
                                uint32_t offset, uint32_t length) {
   assert(object != NULL);
+  ESP_LOGI(TAG, "Service read operation for obj %s off(%d) len(%d)",
+           object->name, offset, length);
   int rc = 0;
   oacp_response_t response = {.op = OACP_OP_READ,
                               .result = OACP_RESULT_SUCCESS};
@@ -134,10 +145,13 @@ static int oacp_read_operation(uint16_t conn_handle, ots_object_t *object,
   }
 
   coc_release_channel();
+  ESP_LOGI(TAG, "SUCCESSFULLY serviced read operation for object %s",
+           object->name);
   return 0;
 
 error:
   coc_force_close();
+  ESP_LOGE(TAG, "FAILED to service read operation for object %s, object->name");
   return rc;
 }
 
@@ -149,11 +163,14 @@ int oacp_request_worker(uint16_t conn_handle, ots_object_t *object,
   int rc = 0;
   oacp_response_t response = {.op = request->op};
 
+  // Locked by bluetooth task
+  /*
   if (lockOtsTable() != pdTRUE) {
     response.result = OACP_RESULT_OBJ_LOCKED;
     ESP_LOGE(TAG, "oacp_request_worker: OTS object locked");
     return oacp_indicate(conn_handle, &response);
   }
+  */
 
   uint32_t offset = 0;
   uint32_t length = 0;
@@ -167,7 +184,8 @@ int oacp_request_worker(uint16_t conn_handle, ots_object_t *object,
     }
     offset = request->parameter.checksum_read_param.offset;
     length = request->parameter.checksum_read_param.length;
-    if (offset + length > object->size.decoded.allocated_size) {
+    if (offset + length > object->size.decoded.allocated_size ||
+        !(length > 0)) {
       response.result = OACP_RESULT_INV_PARAM;
       return oacp_indicate(conn_handle, &response);
     }

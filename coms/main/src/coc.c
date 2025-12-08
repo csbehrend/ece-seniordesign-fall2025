@@ -1,5 +1,6 @@
 #include "common.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "host/ble_l2cap.h"
@@ -118,6 +119,10 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
     return 0;
   }
 
+  if (claimedEvent) {
+    xSemaphoreGive(coc_operation_initiated);
+  }
+
 handler:
   switch (event->type) {
   case BLE_L2CAP_EVENT_COC_CONNECTED:
@@ -152,28 +157,30 @@ handler:
     coc_chan = NULL;
     ESP_LOGI(TAG, "LE CoC disconnected, chan: %p\n", event->disconnect.chan);
     return 0;
-  /*
-  case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
-    if (event->receive.sdu_rx != NULL) {
-      MODLOG_DFLT(INFO,
-                  "Data received (%d bytes): ", event->receive.sdu_rx->om_len);
-      os_mbuf_free(event->receive.sdu_rx);
-    }
-    fflush(stdout);
-    bleprph_l2cap_coc_accept(event->receive.conn_handle, peer_sdu_size,
-                             event->receive.chan);
+    /*
+    case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
+      if (event->receive.sdu_rx != NULL) {
+        MODLOG_DFLT(INFO,
+                    "Data received (%d bytes): ",
+    event->receive.sdu_rx->om_len); os_mbuf_free(event->receive.sdu_rx);
+      }
+      fflush(stdout);
+      bleprph_l2cap_coc_accept(event->receive.conn_handle, peer_sdu_size,
+                               event->receive.chan);
 
-    blecent_l2cap_coc_send_data(coc_chan);
-    return 0;
+      blecent_l2cap_coc_send_data(coc_chan);
+      return 0;
+    */
 
   case BLE_L2CAP_EVENT_COC_ACCEPT:
     peer_sdu_size = event->accept.peer_sdu_size;
+
     bleprph_l2cap_coc_accept(event->accept.conn_handle,
                              event->accept.peer_sdu_size, event->accept.chan);
     MODLOG_DFLT(INFO, "Peer SDU Size = %d bytes", peer_sdu_size);
     return 0;
-  */
   default:
+    assert(0);
     return 0;
   }
 }
@@ -185,10 +192,10 @@ int await_coc_event(struct ble_l2cap_event *event) {
 }
 
 struct ble_l2cap_chan *coc_acquire_channel() {
-  if (xSemaphoreTake(coc_operation_initiated, pdMS_TO_TICKS(500) != pdTRUE)) {
+  if (xSemaphoreTake(coc_operation_initiated, pdMS_TO_TICKS(500)) != pdTRUE) {
     return NULL;
   }
-  if (xSemaphoreTake(coc_channel_ready, pdMS_TO_TICKS(500) != pdTRUE)) {
+  if (xSemaphoreTake(coc_channel_ready, pdMS_TO_TICKS(500)) != pdTRUE) {
     xSemaphoreGive(coc_operation_initiated);
     return NULL;
   }
@@ -233,7 +240,8 @@ void ble_coc_worker_task(void *pvParameters) {
     ESP_LOGI(TAG, "ble_coc_worker_task: received coc operation from OACP");
 
     oacp_request_worker(operation.conn_handle, operation.object,
-                        operation.request);
+                        &operation.request);
+    unlockOtsTable();
   }
 }
 
@@ -245,12 +253,25 @@ void bleprph_l2cap_coc_mem_init(void) {
   rc = os_mbuf_pool_init(&sdu_os_mbuf_pool, &sdu_coc_mbuf_mempool,
                          COC_MBUF_MEMBLOCK_SIZE, COC_BUF_COUNT);
   assert(rc == 0);
+
   coc_queue = xQueueCreate(3, sizeof(coc_operation_t));
   assert(coc_queue != NULL);
+
+  // Gives when ready
   coc_processing = xSemaphoreCreateBinary();
   assert(coc_processing != NULL);
+
   coc_channel_ready = xSemaphoreCreateBinary();
   assert(coc_channel_ready != NULL);
+
+  // Must start free
   coc_operation_initiated = xSemaphoreCreateBinary();
   assert(coc_operation_initiated != NULL);
+  xSemaphoreGive(coc_operation_initiated);
+
+  vQueueAddToRegistry(coc_processing, "COC_PROCESSING");
+  vQueueAddToRegistry(coc_channel_ready, "COC_CHANNEL_READY");
+  vQueueAddToRegistry(coc_operation_initiated, "COC_OP_INITIATED");
+
+  xTaskCreate(ble_coc_worker_task, "BLE COC WORKER", 4096, NULL, 6, NULL);
 }

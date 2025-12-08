@@ -340,6 +340,28 @@ int object_action_control_point_chr_access(uint16_t conn_handle,
     goto indicate;
   }
 
+  if (xSemaphoreTake(coc_processing, 0) != pdTRUE) {
+    response.result = OACP_RESULT_OBJ_LOCKED;
+    ESP_LOGE(TAG, "object_action_control_point_chr_access: task busy");
+    goto indicate;
+  }
+
+  if (lockOtsTable() != pdTRUE) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+  coc_operation_t operation = {
+      .conn_handle = conn_handle, .object = CURRENT_OBJ(), .request = request};
+  rc = xQueueSend(coc_queue, &operation, pdMS_TO_TICKS(100));
+  if (rc != pdPASS) {
+    response.result = OACP_RESULT_OBJ_LOCKED;
+    xSemaphoreGive(coc_processing);
+    unlockOtsTable();
+    ESP_LOGE(TAG,
+             "object_action_control_point_chr_access: failed to load operation "
+             "into queue");
+  }
+  return 0;
+
 indicate:
   txom = ble_hs_mbuf_from_flat(&response, sizeof(response));
   if (!txom) {

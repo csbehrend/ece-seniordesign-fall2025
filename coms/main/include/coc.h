@@ -29,7 +29,7 @@ extern QueueHandle_t coc_forward_event;
 typedef struct {
   int16_t conn_handle;
   ots_object_t *object;
-  oacp_request_t *request;
+  oacp_request_t request;
 } coc_operation_t;
 
 int coc_request_operation(coc_operation_t *operation);
