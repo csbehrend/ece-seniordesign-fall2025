@@ -73,8 +73,11 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx:24.6.1")
 
     implementation("no.nordicsemi.android.support.v18:scanner:1.6.0")
-    implementation("no.nordicsemi.android:ble:2.6.0")
-    implementation("no.nordicsemi.android:ble-ktx:2.6.0")
+//    implementation("no.nordicsemi.android:ble:2.6.0")
+//    implementation("no.nordicsemi.android:ble-ktx:2.6.0")
+
+    implementation("no.nordicsemi.android:ble:2.7.1")
+    implementation("no.nordicsemi.android:ble-ktx:2.7.1")
 
     implementation("com.google.dagger:hilt-android:2.57.1")
     kapt("com.google.dagger:hilt-compiler:2.57.1")
@@ -84,5 +87,8 @@ dependencies {
     implementation("no.nordicsemi.android.kotlin.ble:scanner:1.0.15")
     implementation("no.nordicsemi.android.kotlin.ble:client-android:1.0.15")
     implementation("no.nordicsemi.android.kotlin.ble:core:1.0.15")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
 }

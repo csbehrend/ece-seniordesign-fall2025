@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 
 
@@ -38,7 +39,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 fun progressScreen( modifier: Modifier = Modifier,
                     counts: Int)
 {
-
+    val gloveManager = hiltViewModel<GloveManager>()
+    val gloveState by gloveManager.gloveState.collectAsState()
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
@@ -55,6 +57,7 @@ fun progressScreen( modifier: Modifier = Modifier,
                 }
             }
     }
+    val countsFromGlove = gloveState.currentReps
 
     Box(
         modifier = Modifier
@@ -89,7 +92,8 @@ fun progressScreen( modifier: Modifier = Modifier,
         )
         {
             var counts by remember { mutableStateOf(counts) }
-            var total = counts
+            //var total = counts
+            var total = countsFromGlove
             repeat(sessions) {index ->
                 val toFill = if (total >= sets) {
                     total -= sets

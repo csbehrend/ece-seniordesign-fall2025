@@ -67,11 +67,15 @@ fun commandScreen(modifier: Modifier = Modifier)
     //var sliderPosition by remember { mutableFloatStateOf(0f) }
     //var speed by remember { mutableFloatStateOf(0f) }
     val scannerViewModel: SimpleBleScanner = hiltViewModel()
+    // check this line
+    val gloveManager = hiltViewModel<GloveManager>()
     val viewModel: SpeedViewModel = viewModel()
     val sliderPosition = viewModel.sliderPosition
     val speed = viewModel.speed
     var showPopup by remember { mutableStateOf(false) }
     val scannerUiState by scannerViewModel.uiState.collectAsState()
+    val gloveState by gloveManager.gloveState.collectAsState()
+
 
 
     // Launcher to request runtime permissions
@@ -175,10 +179,22 @@ fun commandScreen(modifier: Modifier = Modifier)
                                 } else {
                                     Column {
                                         state.devices.forEach { device ->
-                                            Text(
-                                                text = "${device.name ?: "Unknown"} (${device.rssi} dBm)",
-                                                modifier = Modifier.padding(8.dp)
+                                            Button(
+                                                onClick = {
+                                                    gloveManager.connectToDevice(device)
+                                                    scannerViewModel.stopScanning()
+                                                    showPopup = false
+                                                },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp)
                                             )
+                                            {
+                                                Text(
+                                                    text = "${device.name ?: "Unknown"} (${device.rssi} dBm)",
+                                                    modifier = Modifier.padding(8.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -203,7 +219,11 @@ fun commandScreen(modifier: Modifier = Modifier)
             }
 
             Button (
-                onClick = {},
+                onClick = {
+                    gloveManager.simulateExercise(reps = 8, delayMs = 500)
+                    //gloveManager.startExercise()
+                },
+               // enabled = gloveState.isConnected && !gloveState.isExercising,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF5DAFA7)),
                 modifier = Modifier
@@ -233,6 +253,7 @@ fun commandScreen(modifier: Modifier = Modifier)
             }
             Button (
                 onClick = {},
+                //enabled = false,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFE8825C)),
                 modifier = Modifier
@@ -262,6 +283,7 @@ fun commandScreen(modifier: Modifier = Modifier)
             }
             Button (
                 onClick = {},
+                //enabled = false,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF5DAFA7)),
                 modifier = Modifier
