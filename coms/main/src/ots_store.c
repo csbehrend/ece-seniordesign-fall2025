@@ -23,7 +23,7 @@
 #include <string.h>
 
 static uint32_t m_testval = 4567;
-static uint8_t m_array[4096] = {0};
+static uint8_t m_array[500] = {0};
 
 static oacp_read_cb generic_mem_read;
 static oacp_write_cb generic_mem_write;
@@ -56,8 +56,8 @@ static ots_object_t test[] = {
         .size.decoded = {.current_size = sizeof(m_array),
                          .allocated_size = sizeof(m_array)},
         .id.luid = {0x9e, 0x98, 0x42, 0x13, 0x78},
-        .properties.decoded = {.read = 1, .write = 1},
-        .cb_func = {.read = generic_mem_read},
+        .properties.decoded = {.read = 1, .write = 1, .truncate = 1},
+        .cb_func = {.read = generic_mem_read, .write = generic_mem_write},
         .base = m_array,
     }};
 
@@ -123,7 +123,7 @@ void ots_store_init() {
     return;
   }
   for (int i = 0; i < ARRAY_SIZE(m_array); ++i) {
-    m_array[i] = i;
+    m_array[i] = 0xEE;
   }
   unlockOtsTable();
 }
@@ -223,6 +223,7 @@ static int oacp_write_operation(uint16_t conn_handle, ots_object_t *object,
       ESP_LOGE(TAG, "event type not DATA_RECEIVED, instead %d", event.type);
       goto error;
     }
+    assert(event.receive.sdu_rx != NULL);
     if (event.receive.sdu_rx->om_len > remaining_len) {
       ESP_LOGE(TAG, "bad packet length %d for remaining_len %d",
                event.receive.sdu_rx->om_len, remaining_len);
@@ -230,6 +231,7 @@ static int oacp_write_operation(uint16_t conn_handle, ots_object_t *object,
       goto error;
     }
     struct os_mbuf *buf = event.receive.sdu_rx;
+    /*
     if (buf->om_len < remaining_len) {
       rc = bleprph_l2cap_coc_accept(event.receive.conn_handle, peer_sdu_size,
                                     chan);
@@ -238,6 +240,7 @@ static int oacp_write_operation(uint16_t conn_handle, ots_object_t *object,
         goto error;
       }
     }
+    */
     rc = write(object, buf, current_size, buf->om_len);
     if (rc) {
       ESP_LOGE(TAG, "write callback error");
@@ -245,12 +248,6 @@ static int oacp_write_operation(uint16_t conn_handle, ots_object_t *object,
     }
     current_size += buf->om_len;
     os_mbuf_free(buf);
-  }
-
-  rc = await_coc_event(&event);
-  if (event.type != BLE_L2CAP_EVENT_COC_DISCONNECTED) {
-    ESP_LOGE(TAG, "final event not DISCONNECTED, instead %d", event.type);
-    goto error;
   }
 
   object->size.decoded.current_size = offset + length;
@@ -265,8 +262,8 @@ error:
   } else {
     coc_force_close();
   }
-  ESP_LOGE(TAG, "FAILED to service WRITE operation for object %s",
-           object->name);
+  ESP_LOGE(TAG, "FAILED to service WRITE operation for object %s, %d of %d",
+           object->name, current_size, length);
   return rc;
 }
 

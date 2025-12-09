@@ -9,19 +9,17 @@
 SVC_DECLARE_UUID128(automation);
 
 CHR_DECLARE_UUID128(auto_start);
-// CHR_DECLARE_UUID128(auto_pause);
-// CHR_DECLARE_UUID128(auto_stop);
+CHR_DECLARE_UUID128(auto_pause);
+CHR_DECLARE_UUID128(auto_stop);
 CHR_DECLARE_UUID128(auto_state);
-
-// GATT_CHR_ENTRY(auto_pause, BLE_GATT_CHR_F_WRITE),
-// GATT_CHR_ENTRY(auto_cancel, BLE_GATT_CHR_F_WRITE),
 
 #define AUTOMATION_SERVICE_ENTRY()                                             \
   GATT_SVC_ENTRY_BEGIN(automation)                                             \
   GATT_CHR_ENTRY(auto_start, BLE_GATT_CHR_F_WRITE),                            \
       GATT_CHR_ENTRY(auto_state,                                               \
                      BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_INDICATE),           \
-      GATT_SVC_ENTRY_END()
+      GATT_CHR_ENTRY(auto_pause, BLE_GATT_CHR_F_WRITE),                        \
+      GATT_CHR_ENTRY(auto_stop, BLE_GATT_CHR_F_WRITE), GATT_SVC_ENTRY_END()
 
 // GATT_CHR_ENTRY(auto_pause, BLE_GATT_CHR_F_WRITE),
 // GATT_CHR_ENTRY(auto_cancel, BLE_GATT_CHR_F_WRITE),
@@ -36,6 +34,17 @@ typedef struct {
 extern QueueHandle_t exercise_queue;
 
 void init_glove_automation();
+
+typedef enum {
+  GLOVE_INPUT_START = 0x00,
+  GLOVE_INPUT_PAUSE = 0x02,
+  GLOVE_INPUT_STOP = 0x03,
+} glove_input_type_t;
+
+typedef struct {
+  glove_input_type_t type;
+  glove_exercise_t exercise;
+} glove_user_event_t;
 
 /*
 typedef enum {

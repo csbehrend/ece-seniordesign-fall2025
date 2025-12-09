@@ -1,6 +1,8 @@
 [submodule "coms-android/Kotlin-BLE-Library"]
 	path = coms-android/Kotlin-BLE-Library
 	url = git@github.com:csbehrend/Kotlin-BLE-Library.git
+  branch = version/2.0
 [submodule "coms-android/Android-nRF-Toolbox"]
 	path = coms-android/Android-nRF-Toolbox
 	url = git@github.com:csbehrend/Android-nRF-Toolbox.git
+  branch = main

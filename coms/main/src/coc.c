@@ -164,6 +164,15 @@ int bleprph_l2cap_coc_event_cb(struct ble_l2cap_event *event, void *arg) {
       // Will stall until ready
       return default_coc_event_cb(event);
     }
+    if (event->type == BLE_L2CAP_EVENT_COC_DATA_RECEIVED) {
+      ESP_LOGI(TAG, "requesting more data from host");
+      rc = bleprph_l2cap_coc_accept(event->receive.conn_handle, peer_sdu_size,
+                                    event->accept.chan);
+      if (rc) {
+        ESP_LOGE(TAG, "coc_accept error from nimble task %d", rc);
+      }
+      return rc;
+    }
     return 0;
   }
 
