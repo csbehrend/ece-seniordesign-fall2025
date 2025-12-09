@@ -192,6 +192,7 @@ struct ble_l2cap_chan *coc_acquire_channel() {
 }
 
 void coc_release_channel() {
+  xQueueReset(coc_forward_event);
   xSemaphoreGive(coc_operation_initiated);
   xSemaphoreGive(coc_channel_ready);
 }

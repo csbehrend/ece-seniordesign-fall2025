@@ -23,7 +23,7 @@
 #include <string.h>
 
 static uint32_t m_testval = 4567;
-static uint8_t m_array[65536] = {0};
+static uint8_t m_array[4096] = {0};
 
 static oacp_read_cb generic_mem_read;
 static oacp_write_cb generic_mem_write;
@@ -223,12 +223,6 @@ static int oacp_write_operation(uint16_t conn_handle, ots_object_t *object,
       ESP_LOGE(TAG, "event type not DATA_RECEIVED, instead %d", event.type);
       goto error;
     }
-    rc = bleprph_l2cap_coc_accept(event.receive.conn_handle, peer_sdu_size,
-                                  chan);
-    if (rc) {
-      ESP_LOGE(TAG, "coc_accept error %d", rc);
-      goto error;
-    }
     if (event.receive.sdu_rx->om_len > remaining_len) {
       ESP_LOGE(TAG, "bad packet length %d for remaining_len %d",
                event.receive.sdu_rx->om_len, remaining_len);
@@ -236,6 +230,14 @@ static int oacp_write_operation(uint16_t conn_handle, ots_object_t *object,
       goto error;
     }
     struct os_mbuf *buf = event.receive.sdu_rx;
+    if (buf->om_len < remaining_len) {
+      rc = bleprph_l2cap_coc_accept(event.receive.conn_handle, peer_sdu_size,
+                                    chan);
+      if (rc) {
+        ESP_LOGE(TAG, "coc_accept error %d", rc);
+        goto error;
+      }
+    }
     rc = write(object, buf, current_size, buf->om_len);
     if (rc) {
       ESP_LOGE(TAG, "write callback error");
