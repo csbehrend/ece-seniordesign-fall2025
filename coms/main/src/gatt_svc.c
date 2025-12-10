@@ -1,232 +1,229 @@
 /*
- * ============================================================================
- * Filename   : gatt_svc.c
- * Author     : Connor Behrend
- * Description: Based on ESP-IDF example.
- * ============================================================================
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
-/* Includes */
-#include "gatt_svc.h"
-#include "common.h"
-#include "heart_rate.h"
+#include "automation.h"
+#include "bleprph.h"
+#include "host/ble_hs.h"
+#include "host/ble_uuid.h"
 #include "led.h"
+#include "ots.h"
+#include "services/ans/ble_svc_ans.h"
+#include "services/gap/ble_svc_gap.h"
+#include "services/gatt/ble_svc_gatt.h"
+#include <assert.h>
 
-/* Private function declarations */
-static int heart_rate_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-                                 struct ble_gatt_access_ctxt *ctxt, void *arg);
-static int led_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-                          struct ble_gatt_access_ctxt *ctxt, void *arg);
+/*** Maximum number of characteristics with the notify flag ***/
+#define MAX_NOTIFY 5
 
-/* Private variables */
-/* Heart rate service */
-static const ble_uuid16_t heart_rate_svc_uuid = BLE_UUID16_INIT(0x180D);
+static const ble_uuid128_t gatt_svr_svc_uuid =
+    BLE_UUID128_INIT(0x2d, 0x71, 0xa2, 0x59, 0xb4, 0x58, 0xc8, 0x12, 0x99, 0x99,
+                     0x43, 0x95, 0x12, 0x2f, 0x46, 0x59);
 
-static uint8_t heart_rate_chr_val[2] = {0};
-static uint16_t heart_rate_chr_val_handle;
-static const ble_uuid16_t heart_rate_chr_uuid = BLE_UUID16_INIT(0x2A37);
+/* A characteristic that can be subscribed to */
+static uint8_t gatt_svr_chr_val;
+static uint16_t gatt_svr_chr_val_handle;
+static const ble_uuid128_t gatt_svr_chr_uuid =
+    BLE_UUID128_INIT(0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x11, 0x22, 0x22,
+                     0x22, 0x22, 0x33, 0x33, 0x33, 0x33);
 
-static uint16_t heart_rate_chr_conn_handle = 0;
-static bool heart_rate_chr_conn_handle_inited = false;
-static bool heart_rate_ind_status = false;
+/* A custom descriptor */
+static uint8_t gatt_svr_dsc_val;
+static const ble_uuid128_t gatt_svr_dsc_uuid =
+    BLE_UUID128_INIT(0x01, 0x01, 0x01, 0x01, 0x12, 0x12, 0x12, 0x12, 0x23, 0x23,
+                     0x23, 0x23, 0x34, 0x34, 0x34, 0x34);
 
-/* Automation IO service */
-static const ble_uuid16_t auto_io_svc_uuid = BLE_UUID16_INIT(0x1815);
-static uint16_t led_chr_val_handle;
-static const ble_uuid128_t led_chr_uuid =
-    BLE_UUID128_INIT(0x23, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
-                     0x12, 0x12, 0x25, 0x15, 0x00, 0x00);
-static uint16_t stop_chr_val_handle;
-static const ble_uuid128_t stop_chr_uuid =
-    BLE_UUID128_INIT(0xb0, 0x8a, 0xa9, 0x8c, 0x96, 0x9a, 0x64, 0x91, 0x13, 0x45,
-                     0xf1, 0x17, 0x12, 0x51, 0x4d, 0x6d);
+static int gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
+                           struct ble_gatt_access_ctxt *ctxt, void *arg);
 
-/* GATT services table */
 static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
-    /* Heart rate service */
-    {.type = BLE_GATT_SVC_TYPE_PRIMARY,
-     .uuid = &heart_rate_svc_uuid.u,
-     .characteristics =
-         (struct ble_gatt_chr_def[]){
-             {/* Heart rate characteristic */
-              .uuid = &heart_rate_chr_uuid.u,
-              .access_cb = heart_rate_chr_access,
-              .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_INDICATE,
-              .val_handle = &heart_rate_chr_val_handle},
-             {
-                 0, /* No more characteristics in this service. */
-             }}},
-
-    /* Automation IO service */
     {
+        /*** Service ***/
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
-        .uuid = &auto_io_svc_uuid.u,
+        .uuid = &gatt_svr_svc_uuid.u,
         .characteristics =
-            (struct ble_gatt_chr_def[]){/* LED characteristic */
-                                        {.uuid = &led_chr_uuid.u,
-                                         .access_cb = led_chr_access,
-                                         .flags = BLE_GATT_CHR_F_WRITE,
-                                         .val_handle = &led_chr_val_handle},
-                                        {.uuid = &stop_chr_uuid.u,
-                                         .access_cb = led_chr_access,
-                                         .flags = BLE_GATT_CHR_F_WRITE,
-                                         .val_handle = &stop_chr_val_handle},
-                                        {0}},
+            (struct ble_gatt_chr_def[]){
+                {
+                    /*** This characteristic can be subscribed to by writing
+                       0x00 and 0x01 to the CCCD ***/
+                    .uuid = &gatt_svr_chr_uuid.u,
+                    .access_cb = gatt_svc_access,
+                    .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
+                             BLE_GATT_CHR_F_READ_ENC |
+                             BLE_GATT_CHR_F_WRITE_ENC | BLE_GATT_CHR_F_NOTIFY |
+                             BLE_GATT_CHR_F_INDICATE,
+                    .val_handle = &gatt_svr_chr_val_handle,
+                    .descriptors =
+                        (struct ble_gatt_dsc_def[]){
+                            {
+                                .uuid = &gatt_svr_dsc_uuid.u,
+                                .att_flags =
+                                    BLE_ATT_F_READ | BLE_ATT_F_READ_ENC,
+                                .access_cb = gatt_svc_access,
+                            },
+                            {
+                                0, /* No more descriptors in this characteristic
+                                    */
+                            }},
+                },
+                {
+                    0, /* No more characteristics in this service. */
+                }},
     },
-
+    OTS_SERVICE_ENTRY(),
+    AUTOMATION_SERVICE_ENTRY(),
+    LED_SERVICE_ENTRY(),
+    NRF_SERVICE_ENTRY(),
     {
         0, /* No more services. */
     },
 };
 
-/* Private functions */
-static int heart_rate_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-                                 struct ble_gatt_access_ctxt *ctxt, void *arg) {
-  /* Local variables */
+static int gatt_svr_write(struct os_mbuf *om, uint16_t min_len,
+                          uint16_t max_len, void *dst, uint16_t *len) {
+  uint16_t om_len;
   int rc;
 
-  /* Handle access events */
-  /* Note: Heart rate characteristic is read only */
+  om_len = OS_MBUF_PKTLEN(om);
+  if (om_len < min_len || om_len > max_len) {
+    return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+  }
+
+  rc = ble_hs_mbuf_to_flat(om, dst, max_len, len);
+  if (rc != 0) {
+    return BLE_ATT_ERR_UNLIKELY;
+  }
+
+  return 0;
+}
+
+/**
+ * Access callback whenever a characteristic/descriptor is read or written to.
+ * Here reads and writes need to be handled.
+ * ctxt->op tells weather the operation is read or write and
+ * weather it is on a characteristic or descriptor,
+ * ctxt->dsc->uuid tells which characteristic/descriptor is accessed.
+ * attr_handle give the value handle of the attribute being accessed.
+ * Accordingly do:
+ *     Append the value to ctxt->om if the operation is READ
+ *     Write ctxt->om to the value if the operation is WRITE
+ **/
+static int gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
+                           struct ble_gatt_access_ctxt *ctxt, void *arg) {
+  const ble_uuid_t *uuid;
+  int rc;
+
   switch (ctxt->op) {
-
-  /* Read characteristic event */
   case BLE_GATT_ACCESS_OP_READ_CHR:
-    /* Verify connection handle */
     if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-      ESP_LOGI(TAG, "characteristic read; conn_handle=%d attr_handle=%d",
-               conn_handle, attr_handle);
+      MODLOG_DFLT(INFO, "Characteristic read; conn_handle=%d attr_handle=%d\n",
+                  conn_handle, attr_handle);
     } else {
-      ESP_LOGI(TAG, "characteristic read by nimble stack; attr_handle=%d",
-               attr_handle);
+      MODLOG_DFLT(INFO, "Characteristic read by NimBLE stack; attr_handle=%d\n",
+                  attr_handle);
     }
-
-    /* Verify attribute handle */
-    if (attr_handle == heart_rate_chr_val_handle) {
-      /* Update access buffer value */
-      heart_rate_chr_val[1] = get_heart_rate();
-      rc = os_mbuf_append(ctxt->om, &heart_rate_chr_val,
-                          sizeof(heart_rate_chr_val));
+    uuid = ctxt->chr->uuid;
+    if (attr_handle == gatt_svr_chr_val_handle) {
+      rc =
+          os_mbuf_append(ctxt->om, &gatt_svr_chr_val, sizeof(gatt_svr_chr_val));
       return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
-    goto error;
+    goto unknown;
 
-  /* Unknown event */
-  default:
-    goto error;
-  }
-
-error:
-  ESP_LOGE(
-      TAG,
-      "unexpected access operation to heart rate characteristic, opcode: %d",
-      ctxt->op);
-  return BLE_ATT_ERR_UNLIKELY;
-}
-
-static int led_chr_access(uint16_t conn_handle, uint16_t attr_handle,
-                          struct ble_gatt_access_ctxt *ctxt, void *arg) {
-  /* Local variables */
-  int rc = 0;
-
-  /* Handle access events */
-  /* Note: LED characteristic is write only */
-  switch (ctxt->op) {
-
-  /* Write characteristic event */
   case BLE_GATT_ACCESS_OP_WRITE_CHR:
-    /* Verify connection handle */
     if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-      ESP_LOGI(TAG, "characteristic write; conn_handle=%d attr_handle=%d",
-               conn_handle, attr_handle);
+      MODLOG_DFLT(INFO, "Characteristic write; conn_handle=%d attr_handle=%d",
+                  conn_handle, attr_handle);
     } else {
-      ESP_LOGI(TAG, "characteristic write by nimble stack; attr_handle=%d",
-               attr_handle);
+      MODLOG_DFLT(INFO, "Characteristic write by NimBLE stack; attr_handle=%d",
+                  attr_handle);
     }
-
-    /* Verify attribute handle */
-    if (attr_handle == led_chr_val_handle ||
-        attr_handle == stop_chr_val_handle) {
-      /* Verify access buffer length */
-      if (ctxt->om->om_len == 1) {
-        /* Turn the LED on or off according to the operation bit */
-        if (ctxt->om->om_data[0]) {
-          led_on();
-          ESP_LOGI(TAG, "led turned on!");
-        } else {
-          led_off();
-          ESP_LOGI(TAG, "led turned off!");
-        }
-      } else {
-        goto error;
-      }
+    uuid = ctxt->chr->uuid;
+    if (attr_handle == gatt_svr_chr_val_handle) {
+      rc = gatt_svr_write(ctxt->om, sizeof(gatt_svr_chr_val),
+                          sizeof(gatt_svr_chr_val), &gatt_svr_chr_val, NULL);
+      ble_gatts_chr_updated(attr_handle);
+      MODLOG_DFLT(INFO, "Notification/Indication scheduled for "
+                        "all subscribed peers.\n");
       return rc;
     }
-    goto error;
+    goto unknown;
 
-  /* Unknown event */
+  case BLE_GATT_ACCESS_OP_READ_DSC:
+    if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+      MODLOG_DFLT(INFO, "Descriptor read; conn_handle=%d attr_handle=%d\n",
+                  conn_handle, attr_handle);
+    } else {
+      MODLOG_DFLT(INFO, "Descriptor read by NimBLE stack; attr_handle=%d\n",
+                  attr_handle);
+    }
+    uuid = ctxt->dsc->uuid;
+    if (ble_uuid_cmp(uuid, &gatt_svr_dsc_uuid.u) == 0) {
+      rc =
+          os_mbuf_append(ctxt->om, &gatt_svr_dsc_val, sizeof(gatt_svr_chr_val));
+      return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    goto unknown;
+
+  case BLE_GATT_ACCESS_OP_WRITE_DSC:
+    goto unknown;
+
   default:
-    goto error;
+    goto unknown;
   }
 
-error:
-  ESP_LOGE(TAG, "unexpected access operation to led characteristic, opcode: %d",
-           ctxt->op);
+unknown:
+  /* Unknown characteristic/descriptor;
+   * The NimBLE host should not have called this function;
+   */
+  assert(0);
   return BLE_ATT_ERR_UNLIKELY;
 }
 
-/* Public functions */
-void send_heart_rate_indication(void) {
-  if (heart_rate_ind_status && heart_rate_chr_conn_handle_inited) {
-    ble_gatts_indicate(heart_rate_chr_conn_handle, heart_rate_chr_val_handle);
-    ESP_LOGI(TAG, "heart rate indication sent!");
-  }
-}
-
-/*
- *  Handle GATT attribute register events
- *      - Service register event
- *      - Characteristic register event
- *      - Descriptor register event
- */
 void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg) {
-  /* Local variables */
   char buf[BLE_UUID_STR_LEN];
 
-  /* Handle GATT attributes register events */
   switch (ctxt->op) {
-
-  /* Service register event */
   case BLE_GATT_REGISTER_OP_SVC:
-    ESP_LOGD(TAG, "registered service %s with handle=%d",
-             ble_uuid_to_str(ctxt->svc.svc_def->uuid, buf), ctxt->svc.handle);
+    MODLOG_DFLT(DEBUG, "registered service %s with handle=%d\n",
+                ble_uuid_to_str(ctxt->svc.svc_def->uuid, buf),
+                ctxt->svc.handle);
     break;
 
-  /* Characteristic register event */
   case BLE_GATT_REGISTER_OP_CHR:
-    ESP_LOGD(TAG,
-             "registering characteristic %s with "
-             "def_handle=%d val_handle=%d",
-             ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf),
-             ctxt->chr.def_handle, ctxt->chr.val_handle);
+    MODLOG_DFLT(DEBUG,
+                "registering characteristic %s with "
+                "def_handle=%d val_handle=%d\n",
+                ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf),
+                ctxt->chr.def_handle, ctxt->chr.val_handle);
     break;
 
-  /* Descriptor register event */
   case BLE_GATT_REGISTER_OP_DSC:
-    ESP_LOGD(TAG, "registering descriptor %s with handle=%d",
-             ble_uuid_to_str(ctxt->dsc.dsc_def->uuid, buf), ctxt->dsc.handle);
+    MODLOG_DFLT(DEBUG, "registering descriptor %s with handle=%d\n",
+                ble_uuid_to_str(ctxt->dsc.dsc_def->uuid, buf),
+                ctxt->dsc.handle);
     break;
 
-  /* Unknown event */
   default:
     assert(0);
     break;
   }
 }
-
-/*
- *  GATT server subscribe event callback
- *      1. Update heart rate subscription status
- */
 
 void gatt_svr_subscribe_cb(struct ble_gap_event *event) {
   /* Check connection handle */
@@ -239,38 +236,40 @@ void gatt_svr_subscribe_cb(struct ble_gap_event *event) {
   }
 
   /* Check attribute handle */
-  if (event->subscribe.attr_handle == heart_rate_chr_val_handle) {
-    /* Update heart rate subscription status */
-    heart_rate_chr_conn_handle = event->subscribe.conn_handle;
-    heart_rate_chr_conn_handle_inited = true;
-    heart_rate_ind_status = event->subscribe.cur_indicate;
+  if (event->subscribe.attr_handle == object_list_control_point_chr_handle) {
+    object_list_control_point_ind_status = event->subscribe.cur_indicate;
+    ESP_LOGI(TAG, "SUBSCRIBED TO OLCP");
+  } else if (event->subscribe.attr_handle ==
+             object_action_control_point_chr_handle) {
+    object_action_control_point_ind_status = event->subscribe.cur_indicate;
+    ESP_LOGI(TAG, "SUBSCRIBED TO OACP");
+  } else if (event->subscribe.attr_handle == auto_state_chr_handle) {
+    auto_state_chr_conn_handle = event->subscribe.conn_handle;
+    auto_state_chr_conn_handle_inited = true;
+    auto_state_ind_status = event->subscribe.cur_indicate;
+    ESP_LOGI(TAG, "SUBSCRIBED TO GLOVE STATE");
   }
 }
 
-/*
- *  GATT server initialization
- *      1. Initialize GATT service
- *      2. Update NimBLE host GATT services counter
- *      3. Add GATT services to server
- */
-int gatt_svc_init(void) {
-  /* Local variables */
+int gatt_svr_init(void) {
   int rc;
 
-  /* 1. GATT service initialization */
+  ble_svc_gap_init();
   ble_svc_gatt_init();
+  ble_svc_ans_init();
 
-  /* 2. Update GATT services counter */
   rc = ble_gatts_count_cfg(gatt_svr_svcs);
   if (rc != 0) {
     return rc;
   }
 
-  /* 3. Add GATT services */
   rc = ble_gatts_add_svcs(gatt_svr_svcs);
   if (rc != 0) {
     return rc;
   }
+
+  /* Setting a value for the read-only descriptor */
+  gatt_svr_dsc_val = 0x99;
 
   return 0;
 }
