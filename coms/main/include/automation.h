@@ -3,6 +3,7 @@
 
 /* Includes */
 #include "common.h"
+#include "esp_attr.h"
 #include "freertos/idf_additions.h"
 #include "host/ble_gatt.h"
 
@@ -27,7 +28,7 @@ extern bool auto_state_ind_status;
 extern int auto_state_chr_conn_handle;
 extern bool auto_state_chr_conn_handle_inited;
 
-typedef struct {
+typedef struct PACKED_ATTR {
   uint8_t id;
   uint8_t reps;
   uint8_t speed;

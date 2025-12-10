@@ -53,18 +53,19 @@ int auto_start_chr_access(uint16_t conn_handle, uint16_t attr_handle,
   }
 
   uint16_t len = 0;
-  uint8_t msg;
-  rc = ble_hs_mbuf_to_flat(ctxt->om, &msg, sizeof(msg), &len);
-  if (rc || len != sizeof(msg)) {
+  glove_exercise_t exercise;
+  rc = ble_hs_mbuf_to_flat(ctxt->om, &exercise, sizeof(exercise), &len);
+  if (rc || len != sizeof(exercise)) {
     ESP_LOGE(TAG, "auto_start_chr_access: bad mbuf read or bad payload size");
     return BLE_ATT_ERR_INSUFFICIENT_RES;
   }
 
-  glove_user_event_t event = {.type = GLOVE_INPUT_START,
-                              .exercise = {.id = 2, .reps = 2, .speed = 2}};
+  glove_user_event_t event = {.type = GLOVE_INPUT_START, .exercise = exercise};
 
   if (xQueueSend(exercise_queue, &event, 0) == pdPASS) {
-    ESP_LOGI(TAG, "auto_start_chr_handle: start exercise id %d", msg);
+    ESP_LOGI(TAG,
+             "auto_start_chr_handle: start exercise id %d, reps %d, speed %d",
+             exercise.id, exercise.reps, exercise.speed);
   }
   return rc;
 }

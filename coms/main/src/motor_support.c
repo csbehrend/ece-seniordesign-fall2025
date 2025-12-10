@@ -83,15 +83,15 @@ ledc_channel_config_t ledc_channel_4 = {.speed_mode = LEDC_LOW_SPEED_MODE,
 void pwm_set_angle_1(uint8_t channel, float angle_deg) {
   if (angle_deg < 0)
     angle_deg = 0;
-  if (angle_deg > 180)
-    angle_deg = 180;
+  if (angle_deg > 90)
+    angle_deg = 90;
 
-  float min_pulse_ms = 0.5;
-  float max_pulse_ms = 2.5;
+  float min_pulse_ms = 1.0;
+  float max_pulse_ms = 2.0;
   float pulse_width_ms =
-      min_pulse_ms + (angle_deg / 180.0f) * (max_pulse_ms - min_pulse_ms);
+      min_pulse_ms + (angle_deg / 90) * (max_pulse_ms - min_pulse_ms);
 
-  float period_ms = 1000.0f / 50.0f;
+  float period_ms = 20.0;
   float duty_percent = pulse_width_ms / period_ms;
 
   uint32_t duty = duty_percent * ((1 << 13) - 1);
@@ -124,6 +124,9 @@ int bend_finger(glove_exercise_t *exercise, int initial,
   // TODO: FIX THIS
   assert(exercise->speed > 0 && exercise->speed < 11);
   int speed = (11 - exercise->speed) * 300 + 500;
+
+  assert(finger >= 1 && finger <= 5);
+  assert(count > 0);
 
   int rc = count;
 
@@ -166,9 +169,9 @@ int bend_finger(glove_exercise_t *exercise, int initial,
 
     // check glove events
 
-    servo_slow_rotation((finger - 1), 0, 180, speed);
+    servo_slow_rotation((finger - 1), 0, 90, speed);
     vTaskDelay(pdMS_TO_TICKS(1000)); // 1 second pause after close
-    servo_slow_rotation((finger - 1), 180, 0, speed);
+    servo_slow_rotation((finger - 1), 90, 0, speed);
     is_stop_pressed = gpio_get_level(6); // get emergency stop button state
     if (!is_stop_pressed) {
       while (!is_stop_pressed) {
