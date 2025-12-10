@@ -1,0 +1,6 @@
+build.gradle.kts
+gradle.properties
+gradlew
+gradlew.bat
+.gitmodules
+settings.gradle.kts
