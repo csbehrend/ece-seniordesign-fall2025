@@ -24,6 +24,8 @@ import android.annotation.SuppressLint
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlin.collections.filter
+import kotlinx.coroutines.flow.filter
 data class ScannedDevice(
     val device: ServerDevice,
     val name: String?,
@@ -71,7 +73,9 @@ class SimpleBleScanner @Inject constructor(
                     )
                 }
             }
-            .onEach { scanResult ->
+
+            .filter { !it.device.name.isNullOrBlank() }
+            .onEach{ scanResult ->
                 val address = scanResult.device.address
                 val existing = scanResults[address]
 
@@ -93,6 +97,8 @@ class SimpleBleScanner @Inject constructor(
                     )
                 }
             }
+
+
             .onCompletion {
                 _uiState.update { it.copy(isScanning = false) }
                 scanningJob?.cancel()

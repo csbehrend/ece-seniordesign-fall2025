@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -69,7 +70,7 @@ class MainActivity : ComponentActivity() {
             )
 
             MyApplicationTheme {
-                var selectedIndex by remember { mutableIntStateOf(0) }
+                var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
 
                 val shouldShowBottomBar = currentDestination in listOf(
                     "goalScreen",

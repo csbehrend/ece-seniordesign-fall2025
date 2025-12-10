@@ -210,7 +210,7 @@ fun commandScreen(modifier: Modifier = Modifier)
                                     Text("Scanning for devices...")
                                 } else {
                                     Column {
-                                        state.devices.filter{ it.name != null }.forEach { device ->
+                                        state.devices.forEach { device ->
                                             Button(
                                                 onClick = {
                                                     gloveManager.connectToDevice(device)

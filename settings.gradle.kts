@@ -73,6 +73,11 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ece-seniordesign-fall2025"
-include(":GripAssist")  // This is your actual app_folder module
-include(":scanner")
+//include(":app:GripAssist")  // This is your actual app_folder module
+//include(":scanner")
 //include(":ble-common")
+include(":GripAssist")
+project(":GripAssist").projectDir = file("app/GripAssist")
+
+include(":scanner")
+project(":scanner").projectDir = file("app/scanner")
