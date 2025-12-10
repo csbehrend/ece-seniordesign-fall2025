@@ -141,7 +141,7 @@ public class ConnectRequest extends TimeoutableRequest {
 	/**
 	 * Sets an optional retry count. The BleManager will do that many attempts to connect to the
 	 * device in case of an error. The library will NOT retry if the device is not reachable,
-	 * that is when the 30 sec. timeout occurs. In that case the app should scan before
+	 * that is when the 30 sec. timeout occurs. In that case the app_folder should scan before
 	 * connecting, to make sure the target is in range.
 	 *
 	 * @param count how many times should the BleManager retry to connect.
@@ -157,7 +157,7 @@ public class ConnectRequest extends TimeoutableRequest {
 	/**
 	 * Sets an optional retry count and a delay that the process will wait before each connection
 	 * attempt. The library will NOT retry if the device is not reachable, that is when the 30 sec.
-	 * timeout occurs. In that case the app should scan before connecting, to make sure the
+	 * timeout occurs. In that case the app_folder should scan before connecting, to make sure the
 	 * target is in range.
 	 *
 	 * @param count how many times should the BleManager retry to connect.

@@ -33,7 +33,7 @@ import no.nordicsemi.android.ble.observer.BondingObserver;
 import no.nordicsemi.android.ble.observer.ConnectionObserver;
 
 /**
- * The BleManagerCallbacks should be overridden in your app and all the 'high level' callbacks
+ * The BleManagerCallbacks should be overridden in your app_folder and all the 'high level' callbacks
  * should be added there.
  *
  * @deprecated Use per-request callbacks instead. Check out deprecation descriptions for methods
@@ -118,7 +118,7 @@ public interface BleManagerCallbacks {
 	 * @param optionalServicesFound if <code>true</code> the secondary services were also found
 	 *                              on the device.
 	 * @deprecated This is information internal to the manager. Should it be exposed, it has to be
-	 * implemented in the app layer.
+	 * implemented in the app_folder layer.
 	 */
 	@Deprecated
 	void onServicesDiscovered(@NonNull final BluetoothDevice device, final boolean optionalServicesFound);

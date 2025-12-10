@@ -189,7 +189,7 @@ abstract class BleManagerHandler extends RequestHandler {
 	 * Last received battery value or -1 if value wasn't received.
 	 *
 	 * @deprecated Battery value should be kept in the profile manager instead. See BatteryManager
-	 * class in Android nRF Toolbox app.
+	 * class in Android nRF Toolbox app_folder.
 	 */
 	@IntRange(from = -1, to = 100)
 	@Deprecated
@@ -2432,7 +2432,7 @@ abstract class BleManagerHandler extends RequestHandler {
 					// Note, that operations are added in reverse order to the front of the queue.
 
 					// 1. On devices running Android 4.3-5.x, 8.x and 9.0 the Service Changed
-					//    characteristic needs to be enabled by the app (for bonded devices).
+					//    characteristic needs to be enabled by the app_folder (for bonded devices).
 					//    The request will be ignored if there is no Service Changed characteristic.
 					// This "fix" broke this in Android 8:
 					// https://android-review.googlesource.com/c/platform/system/bt/+/239970
@@ -2541,7 +2541,7 @@ abstract class BleManagerHandler extends RequestHandler {
 			} else if (status == BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION
 					|| status == 8 /* GATT INSUF AUTHORIZATION */
 					|| status == 137 /* GATT AUTH FAIL */) {
-				// This is called when bonding attempt failed, but the app is still trying to read.
+				// This is called when bonding attempt failed, but the app_folder is still trying to read.
 				// We need to cancel the request here, as bonding won't start.
 				log(Log.WARN, () -> "Authentication required (" + status + ")");
 				if (gatt.getDevice().getBondState() == BluetoothDevice.BOND_BONDED) {
@@ -2591,7 +2591,7 @@ abstract class BleManagerHandler extends RequestHandler {
 			} else if (status == BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION
 					|| status == 8 /* GATT INSUF AUTHORIZATION */
 					|| status == 137 /* GATT AUTH FAIL */) {
-				// This is called when bonding attempt failed, but the app is still trying to write.
+				// This is called when bonding attempt failed, but the app_folder is still trying to write.
 				// We need to cancel the request here, as bonding won't start.
 				log(Log.WARN, () -> "Authentication required (" + status + ")");
 				if (gatt.getDevice().getBondState() == BluetoothDevice.BOND_BONDED) {
@@ -2670,7 +2670,7 @@ abstract class BleManagerHandler extends RequestHandler {
 			} else if (status == BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION
 					|| status == 8 /* GATT INSUF AUTHORIZATION */
 					|| status == 137 /* GATT AUTH FAIL */) {
-				// This is called when bonding attempt failed, but the app is still trying to read.
+				// This is called when bonding attempt failed, but the app_folder is still trying to read.
 				// We need to cancel the request here, as bonding won't start.
 				log(Log.WARN, () -> "Authentication required (" + status + ")");
 				if (gatt.getDevice().getBondState() == BluetoothDevice.BOND_BONDED) {
@@ -2730,7 +2730,7 @@ abstract class BleManagerHandler extends RequestHandler {
 			} else if (status == BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION
 					|| status == 8 /* GATT INSUF AUTHORIZATION */
 					|| status == 137 /* GATT AUTH FAIL */) {
-				// This is called when bonding attempt failed, but the app is still trying to write.
+				// This is called when bonding attempt failed, but the app_folder is still trying to write.
 				// We need to cancel the request here, as bonding won't start.
 				log(Log.WARN, () -> "Authentication required (" + status + ")");
 				if (gatt.getDevice().getBondState() == BluetoothDevice.BOND_BONDED) {

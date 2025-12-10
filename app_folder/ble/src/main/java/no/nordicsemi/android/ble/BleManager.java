@@ -74,7 +74,7 @@ import no.nordicsemi.android.ble.utils.ParserUtils;
 /**
  * <p>
  * The BleManager is responsible for managing the low level communication with a Bluetooth LE device.
- * Please see profiles implementation in Android nRF Blinky or Android nRF Toolbox app for an
+ * Please see profiles implementation in Android nRF Blinky or Android nRF Toolbox app_folder for an
  * example of use.
  * <p>
  * This base manager has been tested against number of devices and samples from Nordic SDK.
@@ -100,7 +100,7 @@ import no.nordicsemi.android.ble.utils.ParserUtils;
  * <p>
  * To get logs, override the {@link #log(int, String)} method.
  * <p>
- * The BleManager should be overridden in your app and all the 'high level' callbacks should
+ * The BleManager should be overridden in your app_folder and all the 'high level' callbacks should
  * be called from there.
  */
 @SuppressLint("MissingPermission")
@@ -411,7 +411,7 @@ public abstract class BleManager implements ILogger {
 											final int key) {
 		// The API below is available for Android 4.4 or newer.
 
-		// An app may set the PIN here or set pairing confirmation (depending on the variant) using:
+		// An app_folder may set the PIN here or set pairing confirmation (depending on the variant) using:
 		// device.setPin(new byte[] { '1', '2', '3', '4', '5', '6' });
 		// device.setPairingConfirmation(true);
 
@@ -626,7 +626,7 @@ public abstract class BleManager implements ILogger {
 	 * has changed (e.g. using the DFU), the indication is received few hundred milliseconds later,
 	 * depending on the connection interval.
 	 * When received, Android will start performing a service discovery operation, internally,
-	 * and will NOT notify the app that services has changed.
+	 * and will NOT notify the app_folder that services has changed.
 	 * <p>
 	 * If the gatt.discoverServices() method would be invoked here with no delay, if would return
 	 * cached services, as the SC indication wouldn't be received yet. Therefore, we have to
