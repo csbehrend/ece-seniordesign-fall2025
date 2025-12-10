@@ -55,6 +55,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.os.Build
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.firestore.FirebaseFirestore
 
 class SpeedViewModel : ViewModel() {
     var sliderPosition by mutableStateOf(1f)
@@ -75,6 +78,35 @@ fun commandScreen(modifier: Modifier = Modifier)
     var showPopup by remember { mutableStateOf(false) }
     val scannerUiState by scannerViewModel.uiState.collectAsState()
     val gloveState by gloveManager.gloveState.collectAsState()
+
+    val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
+
+    val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    val username = prefs.getString("username", "") ?: ""
+    var exercise by remember { mutableStateOf("") }
+
+    if (username.isNotEmpty()) {
+        db.collection("users").document(username).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    exercise = document.getString("exercise") ?: ""
+                }
+            }
+    }
+
+
+    val exerciseMap = mapOf(
+        0 to "Thumb",
+        1 to "Index Finger",
+        2 to "Middle Finger",
+        3 to "Ring Finger",
+        4 to "Pinky Finger",
+        5 to "All Fingers",
+        6 to "Fingers One at a Time"
+    )
+
+    val exerciseIndex = exerciseMap.entries.find { it.value == exercise }?.key ?: 0
 
 
 
@@ -159,7 +191,7 @@ fun commandScreen(modifier: Modifier = Modifier)
             )
             {
                 Text(
-                    text = "Connect",
+                    text = if (gloveState.isConnected) "Connected" else "Connect",
                     fontSize = 30.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -178,7 +210,7 @@ fun commandScreen(modifier: Modifier = Modifier)
                                     Text("Scanning for devices...")
                                 } else {
                                     Column {
-                                        state.devices.forEach { device ->
+                                        state.devices.filter{ it.name != null }.forEach { device ->
                                             Button(
                                                 onClick = {
                                                     gloveManager.connectToDevice(device)
@@ -191,7 +223,7 @@ fun commandScreen(modifier: Modifier = Modifier)
                                             )
                                             {
                                                 Text(
-                                                    text = "${device.name ?: "Unknown"} (${device.rssi} dBm)",
+                                                    text = "${device.name}", // optionally show rssi signal strength
                                                     modifier = Modifier.padding(8.dp)
                                                 )
                                             }
@@ -220,10 +252,10 @@ fun commandScreen(modifier: Modifier = Modifier)
 
             Button (
                 onClick = {
-                    gloveManager.simulateExercise(reps = 8, delayMs = 500)
-                    //gloveManager.startExercise()
+                    //gloveManager.simulateExercise(reps = 8, delayMs = 500)
+                    gloveManager.startExercise(exerciseIndex)
                 },
-               // enabled = gloveState.isConnected && !gloveState.isExercising,
+                enabled = gloveState.isConnected && !gloveState.isExercising,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF5DAFA7)),
                 modifier = Modifier
@@ -252,8 +284,10 @@ fun commandScreen(modifier: Modifier = Modifier)
                 )
             }
             Button (
-                onClick = {},
-                //enabled = false,
+                onClick = {
+                    gloveManager.stopExercise()
+                },
+                enabled = gloveState.isConnected && gloveState.isExercising,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFE8825C)),
                 modifier = Modifier
@@ -282,8 +316,14 @@ fun commandScreen(modifier: Modifier = Modifier)
                 )
             }
             Button (
-                onClick = {},
-                //enabled = false,
+                onClick = {
+                    if (gloveState.isPaused) {
+                        gloveManager.startExercise(exerciseIndex)
+                    } else {
+                        gloveManager.pauseExercise(exerciseIndex)
+                    }
+                },
+                enabled = gloveState.isConnected && gloveState.isExercising,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF5DAFA7)),
                 modifier = Modifier
@@ -305,7 +345,7 @@ fun commandScreen(modifier: Modifier = Modifier)
                         .height(100.dp)
                 )
                 Text(
-                    text = "Continue",
+                    text = if (gloveState.isPaused) "Continue" else "Pause",
                     fontSize = 30.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Bold

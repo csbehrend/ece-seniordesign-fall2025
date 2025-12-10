@@ -1,5 +1,4 @@
 package com.example.myapplication
-
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -23,100 +21,74 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 
+
 @Composable
-fun progressScreen(
-    modifier: Modifier = Modifier,
-    counts: Int
-) {
+// fix tickmarks 
+fun progressScreen0( modifier: Modifier = Modifier,
+                    counts: Int)
+{
     val gloveManager = hiltViewModel<GloveManager>()
     val gloveState by gloveManager.gloveState.collectAsState()
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     val username = prefs.getString("username", "") ?: ""
-
     var sessions by remember { mutableIntStateOf(0) }
     var sets by remember { mutableIntStateOf(0) }
-    var totalRepsCompleted by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(username) {
-        if (username.isNotEmpty()) {
-            db.collection("users").document(username).get()
-                .addOnSuccessListener { document ->
-                    if (document.exists()) {
-                        sessions = document.getLong("sessions")?.toInt() ?: 0
-                        sets = document.getLong("sets")?.toInt() ?: 0
-                        totalRepsCompleted = document.getLong("totalRepsCompleted")?.toInt() ?: 0
-                    }
+    if (username.isNotEmpty()){
+        db.collection("users").document(username).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    sessions = document.getLong("sessions")?.toInt() ?: 0
+                    sets = document.getLong("sets")?.toInt() ?: 0
                 }
-        }
-    }
-
-    LaunchedEffect(gloveState.lastEvent) {
-        if (gloveState.lastEvent == GloveEvent.ACTIVITY_COMPLETED && username.isNotEmpty()) {
-            val maxReps = sessions * sets
-            val newTotal = totalRepsCompleted + gloveState.currentReps
-            if (newTotal >= maxReps) {
-                // Reset since activity is completed
-                db.collection("users").document(username)
-                    .update("totalRepsCompleted", 0)
-                    .addOnSuccessListener {
-                        totalRepsCompleted = 0
-                    }
-            } else {
-                // Still not completed, just update normally
-                db.collection("users").document(username)
-                    .update("totalRepsCompleted", newTotal)
-                    .addOnSuccessListener {
-                        totalRepsCompleted = newTotal
-                    }
             }
-        }
     }
-
-    val maxReps = sessions * sets
-    val displayReps = minOf(totalRepsCompleted + gloveState.currentReps, maxReps)
+    val countsFromGlove = gloveState.currentReps
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color = Color(0xFFE6F4F3)),
+            .background(
+                color = Color(0xFFE6F4F3)
+            ),
         contentAlignment = Alignment.Center
-    ) {
+    )
+    {
         Box(
             modifier = Modifier
                 .fillMaxWidth(1f)
                 .height(100.dp)
-                .background(color = Color(0xFFB0E5E8))
+                .background(
+                    color = Color(0xFFB0E5E8)
+                    //shape = RoundedCornerShape(50.dp)
+                )
                 .align(Alignment.TopCenter),
             contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Progress",
-                    fontSize = 30.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Total Reps: $displayReps",
-                    fontSize = 16.sp,
-                    color = Color(0xFF4A6C6C),
-                    fontWeight = FontWeight.Bold
-                )
-            }
+        )
+        {
+            Text(
+                text = "Progress",
+                fontSize = 30.sp,
+                color = Color.Black,
+                fontWeight = FontWeight.Bold
+            )
         }
-
-        Column(
+        Column (
             verticalArrangement = Arrangement.spacedBy(30.dp)
-        ) {
-            var total = displayReps
-            repeat(sessions) { index ->
+        )
+        {
+            var counts by remember { mutableStateOf(counts) }
+            //var total = counts
+            var total = countsFromGlove
+            repeat(sessions) {index ->
                 val toFill = if (total >= sets) {
                     total -= sets
                     1f
@@ -125,13 +97,13 @@ fun progressScreen(
                     total = 0
                     fraction
                 }
-
                 Column {
-                    Row(
+                    Row (
                         modifier = Modifier.fillMaxWidth(0.8f),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    )
+                    {
                         Text(
                             text = "Session ${index + 1}",
                             color = Color(0xFF4A6C6C),
@@ -144,6 +116,7 @@ fun progressScreen(
                             modifier = Modifier
                                 .height(25.dp)
                                 .width(25.dp)
+
                         )
                     }
 
@@ -153,15 +126,17 @@ fun progressScreen(
                             .height(50.dp)
                             .background(
                                 color = Color(0xFFE8F1F2),
-                                shape = RoundedCornerShape(50.dp)
-                            )
-                    ) {
-                        Row(
+                                shape = RoundedCornerShape(50.dp))
+                    )
+                    {
+                        Row (
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            repeat(sets - 1) { index ->
+                        )
+                        {
+                            repeat(sets - 1) {index ->
+
                                 Box(
                                     modifier = Modifier
                                         .width(2.dp)
@@ -176,12 +151,16 @@ fun progressScreen(
                                 .fillMaxHeight()
                                 .background(
                                     color = Color(0xFF5F9B92),
-                                    shape = RoundedCornerShape(50.dp)
-                                )
+                                    shape = RoundedCornerShape(50.dp))
                         )
+
                     }
                 }
+
             }
         }
+
     }
+
+
 }

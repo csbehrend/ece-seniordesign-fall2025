@@ -3,5 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/Android-nRF-Toolbox" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/coms-android/Android-nRF-Toolbox" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/coms-android/Kotlin-BLE-Library" vcs="Git" />
   </component>
 </project>

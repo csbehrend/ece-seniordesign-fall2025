@@ -44,6 +44,7 @@ enum class GloveEvent(val value: Int) {
 data class GloveState(
     val isConnected: Boolean = false,
     val isExercising: Boolean = false,
+    val isPaused: Boolean = false,
     val currentReps: Int = 0,
     val lastEvent: GloveEvent = GloveEvent.UNKNOWN
 )
@@ -56,10 +57,12 @@ class GloveManager @Inject constructor(
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter
     companion object {
         private const val TAG = "GloveManager"
-
-        // UUIDs from your partner's firmware
         private val SERVICE_UUID = UUID.fromString("c13f3ca3-55f5-4ffa-857a-1c3f40ccb300")
         private val AUTO_START_UUID = UUID.fromString("3861a947-7b94-495b-ae3d-c2d669d9f168")
+
+        private val AUTO_PAUSE_UUID = UUID.fromString("f9b94111-c76a-42a3-92a8-8609cfd2c28f")
+
+        private val AUTO_STOP_UUID = UUID.fromString("ca11594c-0a4d-40dc-994c-b64e2b556e74")
         private val AUTO_STATE_UUID = UUID.fromString("c045a031-c506-4756-8bdd-63d55ef3eced")
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
@@ -99,7 +102,7 @@ class GloveManager @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    fun startExercise() {
+    fun startExercise(exerciseIndex: Int) {
         val gatt = bluetoothGatt ?: run {
             Log.e(TAG, "Cannot start: not connected")
             return
@@ -110,8 +113,75 @@ class GloveManager @Inject constructor(
             return
         }
 
+        val byteToSend = byteArrayOf(exerciseIndex.toByte())
         val characteristic = service.getCharacteristic(AUTO_START_UUID) ?: run {
             Log.e(TAG, "Start characteristic not found")
+            return
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeCharacteristic(
+                characteristic,
+                byteArrayOf(0x01),
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            characteristic.value = byteToSend
+            @Suppress("DEPRECATION")
+            gatt.writeCharacteristic(characteristic)
+        }
+
+        Log.d(TAG, "Start command sent")
+    }
+
+    @SuppressLint("MissingPermission")
+    fun pauseExercise(exerciseIndex: Int) {
+        val gatt = bluetoothGatt ?: run {
+            Log.e(TAG, "Cannot pause: not connected")
+            return
+        }
+
+        val service = gatt.getService(SERVICE_UUID) ?: run {
+            Log.e(TAG, "Service not found")
+            return
+        }
+
+        val characteristic = service.getCharacteristic(AUTO_PAUSE_UUID) ?: run {
+            Log.e(TAG, "Pause characteristic not found")
+            return
+        }
+        val byteToSend = byteArrayOf(exerciseIndex.toByte())
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeCharacteristic(
+                characteristic,
+                byteArrayOf(0x01),
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            characteristic.value = byteToSend
+            @Suppress("DEPRECATION")
+            gatt.writeCharacteristic(characteristic)
+        }
+
+        Log.d(TAG, "Pause command sent")
+    }
+
+    @SuppressLint("MissingPermission")
+    fun stopExercise() {
+        val gatt = bluetoothGatt ?: run {
+            Log.e(TAG, "Cannot stop: not connected")
+            return
+        }
+
+        val service = gatt.getService(SERVICE_UUID) ?: run {
+            Log.e(TAG, "Service not found")
+            return
+        }
+
+        val characteristic = service.getCharacteristic(AUTO_STOP_UUID) ?: run {
+            Log.e(TAG, "Stop characteristic not found")
             return
         }
 
@@ -128,7 +198,7 @@ class GloveManager @Inject constructor(
             gatt.writeCharacteristic(characteristic)
         }
 
-        Log.d(TAG, "Start command sent")
+        Log.d(TAG, "Stop command sent")
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -210,6 +280,25 @@ class GloveManager @Inject constructor(
                     GloveEvent.ACTIVITY_COMPLETED -> {
                         _gloveState.value = currentState.copy(
                             isExercising = false,
+                            lastEvent = event
+                        )
+                    }
+                    GloveEvent.ACTIVITY_PAUSED -> {
+                        _gloveState.value = currentState.copy(
+                            isPaused = true,
+                            lastEvent = event
+                        )
+                    }
+                    GloveEvent.ACTIVITY_RESUMED -> {
+                        _gloveState.value = currentState.copy(
+                            isPaused = false,
+                            lastEvent = event
+                        )
+                    }
+                    GloveEvent.ACTIVITY_CANCELED -> {
+                        _gloveState.value = currentState.copy(
+                            isExercising = false,
+                            isPaused = false,
                             lastEvent = event
                         )
                     }

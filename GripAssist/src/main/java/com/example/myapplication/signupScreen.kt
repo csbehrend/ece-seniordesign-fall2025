@@ -231,7 +231,8 @@ fun signupScreen(modifier: Modifier = Modifier, navController: NavController) {
                 onClick = {
                     val user = hashMapOf(
                         "username" to username,
-                        "role" to selectedOption
+                        "role" to selectedOption,
+                        "totalRepsCompleted" to 0
                     )
                     db.collection("users")
                         .document(username)
