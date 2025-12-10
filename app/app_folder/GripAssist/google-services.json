@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "392800380689",
+    "project_id": "gripassist-4ed56",
+    "storage_bucket": "gripassist-4ed56.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:392800380689:android:deb3d3b87322d67b5d8eb0",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEA2E5ZrkPTVTsvDW6-ZqrpXYFiawgIqM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
