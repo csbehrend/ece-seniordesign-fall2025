@@ -7,6 +7,7 @@
  */
 
 #include "adc.h"
+#include "automation.h"
 #include "ble.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -16,8 +17,6 @@
 #include "sdkconfig.h"
 #include <stdint.h>
 #include <stdio.h>
-
-static const char *TAG = "main";
 
 void app_main(void) {
   ESP_LOGI(TAG, "Coms initialized successfully");
@@ -31,4 +30,5 @@ void app_main(void) {
 
   init_ble();
   start_ble();
+  glove_exercise_task(NULL);
 }

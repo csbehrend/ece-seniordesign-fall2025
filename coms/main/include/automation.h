@@ -28,7 +28,9 @@ extern int auto_state_chr_conn_handle;
 extern bool auto_state_chr_conn_handle_inited;
 
 typedef struct {
+  uint8_t id;
   uint8_t reps;
+  uint8_t speed;
 } glove_exercise_t;
 
 extern QueueHandle_t exercise_queue;
@@ -36,7 +38,7 @@ extern QueueHandle_t exercise_queue;
 void init_glove_automation();
 
 typedef enum {
-  GLOVE_INPUT_START = 0x00,
+  GLOVE_INPUT_START = 0x01,
   GLOVE_INPUT_PAUSE = 0x02,
   GLOVE_INPUT_STOP = 0x03,
 } glove_input_type_t;
@@ -66,5 +68,8 @@ typedef enum {
   GLOVE_EVENT_ACTIVITY_CANCELED = 0x06,
   GLOVE_EVENT_ERROR = 0x70,
 } glove_event_t;
+
+void glove_exercise_task(void *param);
+void update_glove_event(glove_event_t event);
 
 #endif // AUTOMATION_H

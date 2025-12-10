@@ -3,6 +3,7 @@
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "host/ble_gatt.h"
+#include "motor_support.h"
 #include "portmacro.h"
 #include <stdint.h>
 
@@ -60,7 +61,7 @@ int auto_start_chr_access(uint16_t conn_handle, uint16_t attr_handle,
   }
 
   glove_user_event_t event = {.type = GLOVE_INPUT_START,
-                              .exercise = {.reps = 8}};
+                              .exercise = {.id = 2, .reps = 2, .speed = 2}};
 
   if (xQueueSend(exercise_queue, &event, 0) == pdPASS) {
     ESP_LOGI(TAG, "auto_start_chr_handle: start exercise id %d", msg);
@@ -165,6 +166,7 @@ int auto_state_chr_access(uint16_t conn_handle, uint16_t attr_handle,
   return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
+/*
 static int start_exercise(glove_exercise_t *exercise, int initial) {
   int rc = 0;
   assert(initial < exercise->reps);
@@ -188,11 +190,11 @@ static int start_exercise(glove_exercise_t *exercise, int initial) {
     }
     update_glove_event(GLOVE_EVENT_REP_COMPLETED);
   }
-  update_glove_event(GLOVE_EVENT_ACTIVITY_COMPLETED);
   return exercise->reps;
 }
+*/
 
-static void glove_exercise_task(void *param) {
+void glove_exercise_task(void *param) {
   int rc = 0;
   for (;;) {
     glove_user_event_t event = {0};
@@ -201,17 +203,31 @@ static void glove_exercise_task(void *param) {
       assert(rc == pdTRUE);
     } while (event.type != GLOVE_INPUT_START);
 
-    int i = start_exercise(&event.exercise, 0);
+    update_glove_event(GLOVE_EVENT_STARTED_ACTIVITY);
+    glove_input_type_t input;
+    int i = bend_finger(&event.exercise, 0, &input);
+    bool good = true;
     while (i < event.exercise.reps && i >= 0) {
+      if (input == GLOVE_INPUT_PAUSE) {
+        update_glove_event(GLOVE_EVENT_ACTIVITY_PAUSED);
+      } else if (input == GLOVE_INPUT_STOP) {
+        update_glove_event(GLOVE_EVENT_ACTIVITY_CANCELED);
+        good = false;
+        break;
+      }
       glove_user_event_t newEvent;
       rc = xQueueReceive(exercise_queue, &newEvent, portMAX_DELAY);
       assert(rc == pdPASS);
       if (newEvent.type == GLOVE_INPUT_START) {
-        i = start_exercise(&event.exercise, i);
+        i = bend_finger(&event.exercise, i, &input);
       } else if (newEvent.type == GLOVE_INPUT_STOP) {
         update_glove_event(GLOVE_EVENT_ACTIVITY_CANCELED);
+        good = false;
         break;
       }
+    }
+    if (good) {
+      update_glove_event(GLOVE_EVENT_ACTIVITY_COMPLETED);
     }
   }
 }
@@ -219,5 +235,6 @@ static void glove_exercise_task(void *param) {
 void init_glove_automation() {
   exercise_queue = xQueueCreate(1, sizeof(glove_user_event_t));
   assert(exercise_queue != NULL);
-  xTaskCreate(glove_exercise_task, "Glove Exercise Sim", 4096, NULL, 5, NULL);
+  // xTaskCreate(glove_exercise_task, "Glove Exercise Sim", 4096, NULL, 5,
+  // NULL);
 }
